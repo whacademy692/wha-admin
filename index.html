@@ -352,6 +352,45 @@ th:first-child, td:first-child { min-width: 15rem; }
 .choice__name { font-weight: 600; font-size: 0.9375rem; }
 .choice__desc { font-size: 0.8125rem; color: var(--muted); line-height: 1.45; }
 
+/* ---- code field -------------------------------------------------------- */
+.input--code {
+  font-family: var(--mono);
+  font-size: 1.25rem;
+  letter-spacing: 0.35em;
+  text-align: center;
+}
+
+/* ---- devices ----------------------------------------------------------- */
+.devices { list-style: none; margin: 0 0 1.25rem; padding: 0; display: flex; flex-direction: column; gap: 0.5rem; }
+
+.device {
+  display: flex; align-items: center; justify-content: space-between; gap: 1rem;
+  padding: 0.85rem 1rem;
+  background: var(--surface); border: 1px solid var(--line); border-radius: var(--r-md);
+}
+.device--current { border-color: var(--brand); background: var(--brand-tint); }
+
+.device__name { font-weight: 600; display: flex; align-items: center; gap: 0.5rem; flex-wrap: wrap; }
+.device__meta { font-size: 0.8125rem; color: var(--muted); margin-top: 0.15rem; }
+.device__tag {
+  font-size: 0.6875rem; font-weight: 600; text-transform: uppercase; letter-spacing: 0.05em;
+  padding: 0.1rem 0.45rem; border-radius: 999px;
+  background: var(--brand); color: #fff;
+}
+
+/* The one destructive control on the page, so it is set apart rather than
+   sitting inline with the ordinary buttons. */
+.danger { border-color: #fecaca; background: #fef2f2; }
+.danger .panel__title { color: #991b1b; }
+.danger__body { margin: 0 0 1rem; font-size: 0.875rem; color: var(--ink-soft); line-height: 1.55; }
+.danger__body code {
+  font-family: var(--mono); font-size: 0.8125rem;
+  background: #fff; padding: 0.1rem 0.3rem; border-radius: var(--r-sm); border: 1px solid #fecaca;
+}
+
+.btn--danger { background: var(--bad); color: #fff; }
+.btn--danger:hover:not(:disabled) { background: #b91c1c; }
+
 /* ---- toasts ------------------------------------------------------------ */
 .toasts {
   position: fixed; right: 1rem; bottom: 1rem; z-index: 60;
@@ -408,6 +447,19 @@ th:first-child, td:first-child { min-width: 15rem; }
       Chrome filled a saved Student ID into the Email box. Keep both if this
       form is ever edited.
     -->
+    <!--
+      ONE form, not two.
+
+      The code step used to be a separate form holding the email and password in
+      memory. That broke the whole point of the emailed button: it opens in a
+      NEW TAB, where that memory does not exist — so the panel asked for the
+      password again, issued a FRESH code, and the code in the link was already
+      dead on arrival.
+
+      Keeping everything in one form fixes it. The fields themselves hold the
+      state, so a link opened in any tab lands on a form with the code already
+      filled and only the password left to type.
+    -->
     <form id="signin" class="stack" autocomplete="off" novalidate>
       <div class="field">
         <label class="field__label" for="f-email">Email</label>
@@ -419,7 +471,16 @@ th:first-child, td:first-child { min-width: 15rem; }
         <input class="input" type="password" id="f-secret" name="adminSecret"
                autocomplete="new-password" required>
       </div>
-      <button class="btn btn--primary btn--full btn--lg" type="submit">Sign in</button>
+
+      <div class="field" id="code-field" hidden>
+        <label class="field__label" for="f-code">Sign-in code</label>
+        <input class="input input--code" type="text" id="f-code" name="code"
+               inputmode="numeric" pattern="[0-9]*" maxlength="8"
+               autocomplete="one-time-code">
+        <span class="field__hint" id="code-hint">Emailed to you. It expires in 10 minutes.</span>
+      </div>
+
+      <button class="btn btn--primary btn--full btn--lg" type="submit" id="signin-btn">Sign in</button>
     </form>
 
     <p class="gate__note">
@@ -445,6 +506,10 @@ th:first-child, td:first-child { min-width: 15rem; }
       <button class="side__item" data-view="overview" type="button">
         <svg viewBox="0 0 24 24" stroke-width="2" aria-hidden="true"><path stroke-linecap="round" stroke-linejoin="round" d="M4 20V10M10 20V4M16 20v-7M22 20H2"/></svg>
         Overview
+      </button>
+      <button class="side__item" data-view="devices" type="button">
+        <svg viewBox="0 0 24 24" stroke-width="2" aria-hidden="true"><rect x="2" y="4" width="14" height="11" rx="2"/><rect x="17" y="9" width="5" height="11" rx="1.5"/><path stroke-linecap="round" d="M6 19h6"/></svg>
+        Devices
       </button>
     </nav>
 
@@ -489,6 +554,32 @@ th:first-child, td:first-child { min-width: 15rem; }
         <button class="btn btn--quiet btn--sm" data-act="refresh" type="button">Refresh</button>
       </header>
       <div id="stats"></div>
+    </section>
+
+    <section data-panel="devices" hidden>
+      <header class="head">
+        <div>
+          <h1 class="head__title">Devices</h1>
+          <p class="head__sub">
+            Everywhere you are signed in. Signing a device out takes effect immediately —
+            it will need your email, password and a fresh emailed code to get back in.
+          </p>
+        </div>
+        <button class="btn btn--quiet btn--sm" data-act="refresh-devices" type="button">Refresh</button>
+      </header>
+
+      <div id="devices"></div>
+
+      <div class="panel danger">
+        <h2 class="panel__title">If your password may have leaked</h2>
+        <p class="danger__body">
+          Signing out everywhere is only half of it. Change
+          <code>ADMIN_SHARED_SECRET</code> in Script Properties as well — a session that
+          already exists is never re-checked against the password, so changing it alone
+          leaves anyone already signed in exactly where they are.
+        </p>
+        <button class="btn btn--danger" data-act="revoke-all" type="button">Sign out all devices</button>
+      </div>
     </section>
 
   </main>
@@ -573,6 +664,57 @@ th:first-child, td:first-child { min-width: 15rem; }
   // here: signing out of one leaves the other alone, and you can be signed into
   // the panel and a student account at the same time to check what they see.
   var TOKEN_KEY = 'wha:admin_token';
+  var DEVICE_KEY = 'wha:admin_device';
+
+  /**
+   * A random id for THIS browser, kept forever.
+   *
+   * It is not a secret and proves nothing on its own — a device only becomes
+   * trusted after a correct emailed code, and the backend records which id was
+   * trusted. Its job is to let the backend recognise a browser it has seen
+   * before, so a code is asked for once rather than every time.
+   *
+   * Clearing site data loses it, which means one more code on the next sign-in.
+   */
+  function deviceId() {
+    var id = null;
+    try { id = localStorage.getItem(DEVICE_KEY); } catch (e) { /* private mode */ }
+    if (!id) {
+      id = (window.crypto && window.crypto.randomUUID)
+        ? window.crypto.randomUUID()
+        : 'dev-' + Date.now() + '-' + Math.random().toString(36).slice(2, 10);
+      try { localStorage.setItem(DEVICE_KEY, id); } catch (e) { /* private mode */ }
+    }
+    return id;
+  }
+
+  /**
+   * A human label for the device list, so you can tell your phone from your PC.
+   *
+   * Read off the user agent, so it is a convenience and not evidence — anything
+   * can claim to be anything. The backend treats it as display text only.
+   */
+  function deviceLabel() {
+    var ua = navigator.userAgent || '';
+    var browser = /Edg\//.test(ua) ? 'Edge'
+      : /OPR\//.test(ua) ? 'Opera'
+      : /Chrome\//.test(ua) ? 'Chrome'
+      : /Firefox\//.test(ua) ? 'Firefox'
+      : /Safari\//.test(ua) ? 'Safari'
+      : 'Browser';
+    var os = /Windows/.test(ua) ? 'Windows'
+      : /Android/.test(ua) ? 'Android'
+      : /iPhone|iPad|iPod/.test(ua) ? 'iOS'
+      : /Mac OS X/.test(ua) ? 'Mac'
+      : /Linux/.test(ua) ? 'Linux'
+      : 'device';
+    return browser + ' on ' + os;
+  }
+
+  // Remembers only the EMAIL between the two halves of sign-in, so a link
+  // opened in a new tab can prefill it. The password is never stored anywhere —
+  // it is typed each time, which is the whole point of asking for it.
+  var PENDING_EMAIL_KEY = 'wha:admin_pending_email';
 
   var STATUSES = ['Active', 'Pending', 'Suspended', 'Expired'];
 
@@ -667,7 +809,10 @@ th:first-child, td:first-child { min-width: 15rem; }
     results = [];
     qs('#results').innerHTML = '';
     qs('#stats').innerHTML = '';
+    qs('#devices').innerHTML = '';
     show('gate');
+    // A stale code box would only fail confusingly on the next attempt.
+    clearCodeStep();
     if (message) toast(message, 'bad');
   }
 
@@ -859,6 +1004,36 @@ th:first-child, td:first-child { min-width: 15rem; }
       .then(function () { busy(button, false); });
   }
 
+  /**
+   * Reveals the code field and remembers the email, so the same form can serve
+   * both halves of sign-in. `remembered` prefills the email when the page was
+   * opened fresh from the email button.
+   */
+  function askForCode(email) {
+    qs('#code-field').hidden = false;
+    qs('#signin-btn').textContent = 'Verify and sign in';
+    if (email) {
+      try { localStorage.setItem(PENDING_EMAIL_KEY, email); } catch (e) { /* private mode */ }
+    }
+  }
+
+  function clearCodeStep() {
+    qs('#code-field').hidden = true;
+    qs('#f-code').value = '';
+    qs('#signin-btn').textContent = 'Sign in';
+    try { localStorage.removeItem(PENDING_EMAIL_KEY); } catch (e) { /* private mode */ }
+  }
+
+  /**
+   * Handles BOTH halves of sign-in from one form.
+   *
+   * No code in the box -> admin/login (email + password).
+   * Code in the box    -> admin/verifyOtp (email + password + code).
+   *
+   * The password goes with the code as well, deliberately: admin/verifyOtp is a
+   * public route, so the code alone must never be enough for whoever happens to
+   * hold it.
+   */
   function submitSignIn(event) {
     event.preventDefault();
     var form = event.target;
@@ -866,17 +1041,38 @@ th:first-child, td:first-child { min-width: 15rem; }
     // explaining why they are not email / password.
     var email = form.adminEmail.value.trim();
     var secret = form.adminSecret.value;
-    var button = form.querySelector('[type="submit"]');
+    var code = form.code.value.trim();
+    var button = qs('#signin-btn');
 
     if (!email || !secret) { toast('Enter both your email and your admin password.', 'bad'); return; }
 
+    var payload = {
+      email: email, sharedSecret: secret,
+      deviceId: deviceId(), deviceLabel: deviceLabel()
+    };
+
     busy(button, true);
-    call('admin/login', { email: email, sharedSecret: secret })
+
+    var request = code
+      ? call('admin/verifyOtp', Object.assign({ code: code }, payload))
+      : call('admin/login', payload);
+
+    request
       .then(function (data) {
-        if (!data || !data.token) throw new Error('The server did not return a session.');
-        setToken(data.token);
-        form.reset();
-        enterConsole(email);
+        if (data && data.token) {
+          setToken(data.token);
+          form.reset();
+          clearCodeStep();
+          enterConsole(email);
+          return;
+        }
+        if (data && data.otpRequired) {
+          askForCode(email);
+          qs('#f-code').focus();
+          toast('A sign-in code was emailed to you. Enter it below, or use the button in the email.', 'ok');
+          return;
+        }
+        throw new Error('The server did not return a session.');
       })
       // The backend answers "Not authorized." for both a wrong email and a
       // wrong password, deliberately — it does not reveal which. Pass that
@@ -885,10 +1081,110 @@ th:first-child, td:first-child { min-width: 15rem; }
       .then(function () { busy(button, false); });
   }
 
+  /**
+   * Fills the code box from ?code= in the URL, then strips it from the address
+   * bar so it does not linger in history or get shared by accident.
+   *
+   * It deliberately does NOT submit on its own. Some mail clients fetch links in
+   * the background to scan them; an auto-submitting link would let that consume
+   * the one-time code before it was ever read. It also cannot submit — the
+   * password is still needed, and only the admin has that.
+   */
+  function applyCodeFromUrl() {
+    var match = /[?&]code=(\d{4,8})/.exec(window.location.search);
+    if (window.history && window.history.replaceState) {
+      window.history.replaceState({}, document.title, window.location.pathname);
+    }
+    if (!match) return false;
+
+    var remembered = null;
+    try { remembered = localStorage.getItem(PENDING_EMAIL_KEY); } catch (e) { /* private mode */ }
+
+    askForCode(null);
+    qs('#f-code').value = match[1];
+    if (remembered && !qs('#f-email').value) qs('#f-email').value = remembered;
+    qs('#f-secret').focus();
+    qs('#code-hint').textContent = 'Filled in from your email. Enter your password to finish.';
+    return true;
+  }
+
+  // ---------------------------------------------------------------- devices
+  /** "3 days ago" reads better than a timestamp when scanning a list. */
+  function ago(iso) {
+    var then = new Date(iso).getTime();
+    if (!then || isNaN(then)) return 'unknown';
+    var mins = Math.floor((Date.now() - then) / 60000);
+    if (mins < 1) return 'just now';
+    if (mins < 60) return mins + ' minute' + (mins === 1 ? '' : 's') + ' ago';
+    var hours = Math.floor(mins / 60);
+    if (hours < 24) return hours + ' hour' + (hours === 1 ? '' : 's') + ' ago';
+    var days = Math.floor(hours / 24);
+    return days + ' day' + (days === 1 ? '' : 's') + ' ago';
+  }
+
+  function renderDevices(list) {
+    var host = qs('#devices');
+    if (!list || !list.length) {
+      host.innerHTML = '<div class="empty"><h2>No devices listed</h2>' +
+        '<p>Sign in again to register this one.</p></div>';
+      return;
+    }
+
+    var rows = list.map(function (d) {
+      var expires = new Date(d.expiresAt).getTime();
+      var daysLeft = expires && !isNaN(expires) ? Math.ceil((expires - Date.now()) / 86400000) : null;
+
+      return '<li class="device' + (d.isCurrent ? ' device--current' : '') + '">' +
+        '<div class="device__body">' +
+        '<div class="device__name">' + esc(d.label) +
+        (d.isCurrent ? '<span class="device__tag">This device</span>' : '') + '</div>' +
+        '<div class="device__meta">Last used ' + esc(ago(d.lastSeenAt)) +
+        (daysLeft !== null ? ' &middot; code needed again in ' + esc(daysLeft) + ' day' + (daysLeft === 1 ? '' : 's') : '') +
+        '</div></div>' +
+        '<button class="btn btn--quiet btn--sm" data-act="revoke" data-device="' + esc(d.deviceId) + '">' +
+        (d.isCurrent ? 'Sign out' : 'Sign out') + '</button></li>';
+    }).join('');
+
+    host.innerHTML = '<ul class="devices">' + rows + '</ul>';
+  }
+
+  function loadDevices() {
+    return authed('admin/devices', {})
+      .then(function (data) { renderDevices((data && data.devices) || []); })
+      .catch(function (err) { fail(err, 'Could not load your devices.'); });
+  }
+
+  function revokeDevice(id, button) {
+    var isSelf = id === deviceId();
+    if (isSelf && !window.confirm('Sign out this device? You will need your email, password and a new emailed code to get back in.')) return;
+
+    busy(button, true);
+    authed('admin/revokeDevice', { deviceId: id })
+      .then(function () {
+        if (isSelf) { endSession('Signed out on this device.'); return; }
+        toast('That device has been signed out.', 'ok');
+        return loadDevices();
+      })
+      .catch(function (err) { fail(err, 'Could not sign that device out.'); })
+      .then(function () { busy(button, false); });
+  }
+
+  function revokeAll(button) {
+    if (!window.confirm('Sign out EVERY device, including this one?\n\nRemember to change ADMIN_SHARED_SECRET in Script Properties too — changing it alone does not end sessions that already exist.')) return;
+    busy(button, true);
+    authed('admin/revokeAllDevices', {})
+      .then(function (data) {
+        endSession('Signed out ' + ((data && data.revokedCount) || 0) + ' device(s). Change the admin password now as well.');
+      })
+      .catch(function (err) { fail(err, 'Could not sign all devices out.'); })
+      .then(function () { busy(button, false); });
+  }
+
   function showView(name) {
     qsa('[data-panel]').forEach(function (p) { p.hidden = p.dataset.panel !== name; });
     qsa('[data-view]').forEach(function (b) { b.classList.toggle('is-active', b.dataset.view === name); });
     if (name === 'overview') loadStats();
+    if (name === 'devices') loadDevices();
   }
 
   function enterConsole(email) {
@@ -918,7 +1214,16 @@ th:first-child, td:first-child { min-width: 15rem; }
   document.addEventListener('click', function (e) {
     var t = e.target.closest('[data-act], [data-view]');
     if (!t) return;
-    if (t.dataset.act === 'signout') endSession();
+    if (t.dataset.act === 'signout') {
+      // Tell the backend as well, so this device is no longer trusted and the
+      // next sign-in needs a fresh code. Local-only sign-out would leave the
+      // device trusted for anyone who reaches this browser.
+      authed('admin/logout', {}).catch(function () { /* sign out locally regardless */ })
+        .then(function () { endSession('Signed out.'); });
+    }
+    if (t.dataset.act === 'refresh-devices') loadDevices();
+    if (t.dataset.act === 'revoke') revokeDevice(t.dataset.device, t);
+    if (t.dataset.act === 'revoke-all') revokeAll(t);
     if (t.dataset.act === 'close') closeDialog();
     if (t.dataset.act === 'refresh') loadStats();
     if (t.dataset.view) showView(t.dataset.view);
@@ -931,7 +1236,16 @@ th:first-child, td:first-child { min-width: 15rem; }
   // A held token decides which screen opens. It is not proof of anything on its
   // own — every route re-checks it server-side — it just avoids showing a
   // sign-in form to someone already signed in.
-  if (getToken()) enterConsole(null); else show('gate');
+  if (getToken()) {
+    enterConsole(null);
+  } else {
+    show('gate');
+    // Arriving from the email's button: fills the code, prefills the email if
+    // this browser started the sign-in, and leaves only the password to type.
+    if (applyCodeFromUrl()) {
+      toast('Code filled in. Enter your password to finish signing in.', 'ok');
+    }
+  }
 })();
 </script>
 
