@@ -1,0 +1,914 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<title>Admin — W.H. Academy</title>
+<meta name="theme-color" content="#3730a3">
+<meta name="robots" content="noindex, nofollow">
+
+<!--
+  ============================================================================
+  W.H. ACADEMY — ADMIN PANEL (standalone)
+  ============================================================================
+
+  ONE FILE. It depends on nothing else — no shared stylesheets, no shared
+  scripts, no service worker, no build step. Drop it in a repo on its own and
+  it works.
+
+  That is deliberate. The panel lives in its own repository so it is not mixed
+  in with the student site, and copying fourteen shared files across to achieve
+  that would have created fourteen things to keep in sync. Everything this page
+  needs is inlined below instead.
+
+  ---------------------------------------------------------------------------
+  THE ONE THING TO KEEP IN SYNC
+  ---------------------------------------------------------------------------
+  API_BASE_URL and API_KEY (just below) are the same two values that live in
+  the student site's assets/js/api.js. They are now written down in TWO places.
+  If you ever rotate the API key or create a NEW deployment URL, change it here
+  as well or this page will stop talking to the backend.
+
+  Editing the existing deployment (Deploy > Manage deployments > pencil >
+  New version) does NOT change the URL, so a normal backend update needs no
+  edit here.
+
+  ---------------------------------------------------------------------------
+  WHAT THIS PAGE IS NOT
+  ---------------------------------------------------------------------------
+  Being in a separate repository does not hide it. GitHub Pages serves whatever
+  it is given to anyone who knows the address, so the protection here is the
+  sign-in, not the address. The address being obscure is a small extra, not a
+  lock.
+
+  Right now that sign-in is email + password only. OTP on a new device, the
+  device list and remote sign-out are the agreed next stage.
+  ============================================================================
+-->
+
+<style>
+/* ---------------------------------------------------------------------------
+   Design tokens. Copied in rather than imported so this file stays standalone —
+   these match the student site's variables.css, so the panel still reads as
+   W.H. Academy.
+--------------------------------------------------------------------------- */
+:root {
+  --brand: #4338ca;
+  --brand-deep: #3730a3;
+  --brand-light: #6366f1;
+  --brand-tint: #eef2ff;
+
+  --ink: #1e293b;
+  --ink-soft: #475569;
+  --muted: #64748b;
+  --faint: #94a3b8;
+
+  --line: #e2e8f0;
+  --line-soft: #f1f5f9;
+  --surface: #ffffff;
+  --canvas: #f1f5f9;
+
+  --ok: #059669;
+  --warn: #d97706;
+  --bad: #dc2626;
+
+  --r-sm: 0.375rem;
+  --r-md: 0.5rem;
+  --r-lg: 0.75rem;
+
+  --shadow: 0 1px 2px rgba(15, 23, 42, 0.06), 0 1px 3px rgba(15, 23, 42, 0.1);
+  --shadow-lg: 0 20px 45px rgba(15, 23, 42, 0.25);
+
+  --sans: system-ui, -apple-system, "Segoe UI", Roboto, "Helvetica Neue", sans-serif;
+  --mono: ui-monospace, SFMono-Regular, Menlo, Consolas, monospace;
+}
+
+*, *::before, *::after { box-sizing: border-box; }
+
+/* [hidden] MUST WIN.
+   The browser only backs `hidden` with a user-agent display:none, and ANY
+   author display rule beats it. Several blocks here set display explicitly.
+   Without this, the sign-in panel and the console both render at once, and the
+   dialog backdrop — position:fixed, inset:0, opacity:0 — sits invisibly over
+   the whole page and swallows every click. Do not remove. */
+[hidden] { display: none !important; }
+
+html, body { height: 100%; }
+
+body {
+  margin: 0;
+  font-family: var(--sans);
+  font-size: 16px;
+  line-height: 1.5;
+  color: var(--ink);
+  background: var(--canvas);
+  -webkit-font-smoothing: antialiased;
+}
+
+button, input { font: inherit; color: inherit; }
+
+.sr-only {
+  position: absolute; width: 1px; height: 1px;
+  padding: 0; margin: -1px; overflow: hidden;
+  clip: rect(0 0 0 0); white-space: nowrap; border: 0;
+}
+
+/* ---- buttons ---------------------------------------------------------- */
+.btn {
+  display: inline-flex; align-items: center; justify-content: center; gap: 0.4rem;
+  padding: 0.55rem 1rem;
+  border: 1px solid transparent;
+  border-radius: var(--r-md);
+  font-size: 0.9375rem; font-weight: 600;
+  cursor: pointer;
+  transition: background-color .15s ease, border-color .15s ease;
+}
+.btn:disabled { opacity: 0.55; cursor: not-allowed; }
+.btn:focus-visible { outline: 2px solid var(--brand); outline-offset: 2px; }
+
+.btn--primary { background: var(--brand); color: #fff; }
+.btn--primary:hover:not(:disabled) { background: var(--brand-deep); }
+
+.btn--secondary { background: var(--brand-tint); color: var(--brand-deep); border-color: #c7d2fe; }
+.btn--secondary:hover:not(:disabled) { background: #e0e7ff; }
+
+.btn--quiet { background: transparent; color: var(--ink-soft); border-color: var(--line); }
+.btn--quiet:hover:not(:disabled) { background: var(--line-soft); }
+
+.btn--sm { padding: 0.35rem 0.7rem; font-size: 0.8125rem; }
+.btn--full { width: 100%; }
+.btn--lg { padding: 0.7rem 1rem; }
+
+/* ---- fields ----------------------------------------------------------- */
+.field { display: flex; flex-direction: column; gap: 0.3rem; }
+
+.field__label { font-size: 0.875rem; font-weight: 600; color: var(--ink-soft); }
+
+.field__hint { font-size: 0.8125rem; color: var(--muted); }
+
+.input {
+  width: 100%;
+  padding: 0.55rem 0.75rem;
+  border: 1px solid var(--line);
+  border-radius: var(--r-md);
+  background: var(--surface);
+}
+.input:focus { outline: 2px solid var(--brand); outline-offset: -1px; border-color: var(--brand); }
+
+.stack { display: flex; flex-direction: column; gap: 1rem; }
+
+/* ---- badges ----------------------------------------------------------- */
+.badge {
+  display: inline-block;
+  padding: 0.15rem 0.55rem;
+  border-radius: 999px;
+  font-size: 0.75rem; font-weight: 600;
+  white-space: nowrap;
+}
+.badge--ok      { background: #d1fae5; color: #065f46; }
+.badge--warn    { background: #fef3c7; color: #92400e; }
+.badge--bad     { background: #fee2e2; color: #991b1b; }
+.badge--neutral { background: var(--line-soft); color: var(--ink-soft); }
+
+/* ---- sign-in gate ------------------------------------------------------ */
+/* Not the app shell: you are not "in" the panel yet. One centred card on the
+   brand colour, and nothing else to look at. */
+.gate {
+  min-height: 100vh; min-height: 100dvh;
+  display: grid; place-items: center;
+  padding: 1rem;
+  background: radial-gradient(120% 80% at 50% 0%, #4f46e5 0%, transparent 60%), var(--brand-deep);
+}
+
+.gate__card {
+  width: 100%; max-width: 24rem;
+  padding: 1.5rem;
+  background: var(--surface);
+  border-radius: var(--r-lg);
+  box-shadow: var(--shadow-lg);
+}
+
+.gate__brand { display: flex; flex-direction: column; gap: 0.1rem; margin-bottom: 1.25rem; }
+.gate__mark  { font-size: 1.25rem; font-weight: 700; color: var(--brand-deep); }
+.gate__sub   { font-size: 0.75rem; letter-spacing: 0.14em; text-transform: uppercase; color: var(--faint); }
+.gate__note  { margin: 1rem 0 0; font-size: 0.8125rem; line-height: 1.5; color: var(--muted); }
+
+/* ---- shell ------------------------------------------------------------- */
+.shell { display: flex; min-height: 100vh; min-height: 100dvh; }
+
+.side {
+  width: 15rem; flex-shrink: 0;
+  display: flex; flex-direction: column; gap: 1.5rem;
+  padding: 1.25rem 1rem;
+  background: var(--brand-deep);
+  color: rgba(255,255,255,0.82);
+}
+
+.side__brand { display: flex; flex-direction: column; gap: 0.1rem; padding: 0 0.5rem; color: #fff; }
+.side__name  { font-size: 1.0625rem; font-weight: 700; line-height: 1.25; }
+.side__tag   { font-size: 0.6875rem; letter-spacing: 0.16em; text-transform: uppercase; color: rgba(255,255,255,0.55); }
+
+.side__nav { display: flex; flex-direction: column; gap: 0.15rem; }
+
+.side__item {
+  display: flex; align-items: center; gap: 0.65rem;
+  width: 100%; padding: 0.6rem 0.5rem;
+  border: 0; border-radius: var(--r-md);
+  background: transparent; color: inherit;
+  font-size: 0.9375rem; text-align: left; cursor: pointer;
+}
+.side__item svg { width: 1.125rem; height: 1.125rem; flex-shrink: 0; stroke: currentColor; fill: none; }
+.side__item:hover { background: rgba(255,255,255,0.1); }
+.side__item.is-active { background: rgba(255,255,255,0.16); color: #fff; font-weight: 600; }
+.side__item:focus-visible { outline: 2px solid #fff; outline-offset: 2px; }
+
+.side__foot { margin-top: auto; display: flex; flex-direction: column; gap: 0.35rem; }
+.side__who  { padding: 0 0.5rem; font-size: 0.75rem; color: rgba(255,255,255,0.55); overflow-wrap: anywhere; }
+
+.main { flex: 1; min-width: 0; padding: 1.5rem; max-width: 76rem; }
+
+/* ---- headings ---------------------------------------------------------- */
+.head { display: flex; align-items: flex-start; justify-content: space-between; gap: 1rem; margin-bottom: 1.25rem; }
+.head__title { margin: 0; font-size: 1.5rem; }
+.head__sub   { margin: 0.2rem 0 0; font-size: 0.875rem; color: var(--muted); max-width: 46ch; }
+
+/* ---- search ------------------------------------------------------------ */
+.search { display: flex; gap: 0.5rem; margin-bottom: 1.25rem; }
+.search__box { position: relative; flex: 1; min-width: 0; }
+.search__box svg {
+  position: absolute; left: 0.75rem; top: 50%; transform: translateY(-50%);
+  width: 1.05rem; height: 1.05rem; stroke: var(--faint); fill: none; pointer-events: none;
+}
+.search__input { padding-left: 2.4rem; }
+
+/* ---- table ------------------------------------------------------------- */
+.table-wrap {
+  overflow-x: auto; -webkit-overflow-scrolling: touch;
+  background: var(--surface);
+  border: 1px solid var(--line);
+  border-radius: var(--r-md);
+}
+
+table { width: 100%; min-width: 52rem; border-collapse: collapse; }
+
+th, td { padding: 0.7rem 0.9rem; text-align: left; vertical-align: middle; }
+
+th {
+  font-size: 0.75rem; font-weight: 600; letter-spacing: 0.05em; text-transform: uppercase;
+  color: var(--muted); border-bottom: 1px solid var(--line);
+}
+
+td { border-bottom: 1px solid var(--line-soft); font-size: 0.9375rem; }
+tbody tr:last-child td { border-bottom: 0; }
+tbody tr:hover { background: #fafbfc; }
+
+.cell-name { font-weight: 600; }
+.cell-sub  { font-size: 0.8125rem; color: var(--muted); overflow-wrap: anywhere; }
+.cell-id   { font-family: var(--mono); font-size: 0.8125rem; font-variant-numeric: tabular-nums; white-space: nowrap; }
+.cell-act  { text-align: right; white-space: nowrap; }
+
+.muted { color: var(--muted); }
+.count { margin-top: 0.5rem; font-size: 0.8125rem; color: var(--muted); }
+
+/* A dot rather than a second badge: "has an account" is a quieter fact than the
+   enrollment status beside it, and two badges per row would compete. */
+.dot { display: inline-flex; align-items: center; gap: 0.4rem; font-size: 0.8125rem; white-space: nowrap; }
+.dot::before { content: ""; width: 0.45rem; height: 0.45rem; border-radius: 50%; flex-shrink: 0; }
+.dot--ok::before   { background: var(--ok); }
+.dot--ok           { color: var(--ink-soft); }
+.dot--warn::before { background: var(--warn); }
+.dot--warn         { color: var(--warn); }
+
+/* ---- empty ------------------------------------------------------------- */
+.empty {
+  padding: 3rem 1.5rem; text-align: center;
+  background: var(--surface); border: 1px solid var(--line); border-radius: var(--r-md);
+}
+.empty h2 { margin: 0 0 0.35rem; font-size: 1.0625rem; }
+.empty p  { margin: 0; color: var(--muted); font-size: 0.9375rem; }
+
+/* ---- overview ---------------------------------------------------------- */
+.tiles { display: grid; grid-template-columns: repeat(auto-fit, minmax(9rem, 1fr)); gap: 0.75rem; margin-bottom: 1.25rem; }
+
+.tile {
+  display: flex; flex-direction: column; gap: 0.1rem;
+  padding: 1rem; background: var(--surface);
+  border: 1px solid var(--line); border-radius: var(--r-md);
+}
+.tile__value { font-size: 1.75rem; font-weight: 700; line-height: 1.1; color: var(--brand-deep); font-variant-numeric: tabular-nums; }
+.tile__label { font-size: 0.8125rem; color: var(--muted); }
+
+.panel { padding: 1rem; background: var(--surface); border: 1px solid var(--line); border-radius: var(--r-md); }
+.panel__title { margin: 0 0 0.75rem; font-size: 0.875rem; font-weight: 600; color: var(--ink-soft); }
+
+.bars { list-style: none; margin: 0; padding: 0; }
+.bar  { display: flex; justify-content: space-between; gap: 1rem; padding: 0.5rem 0; border-bottom: 1px solid var(--line-soft); font-size: 0.9375rem; }
+.bar:last-child { border-bottom: 0; }
+.bar__value { font-weight: 600; font-variant-numeric: tabular-nums; }
+
+/* ---- dialog ------------------------------------------------------------ */
+.backdrop {
+  position: fixed; inset: 0; z-index: 50;
+  display: flex; align-items: center; justify-content: center;
+  padding: 1rem;
+  background: rgba(18, 26, 42, 0.48);
+}
+
+.dialog {
+  width: 100%; max-width: 30rem; max-height: 90vh; overflow-y: auto;
+  padding: 1.5rem;
+  background: var(--surface); border-radius: var(--r-lg);
+  box-shadow: var(--shadow-lg);
+}
+.dialog h2 { margin: 0 0 1rem; font-size: 1.125rem; }
+
+.dialog__who { display: flex; flex-direction: column; gap: 0.1rem; margin: 0; }
+.dialog__acts { display: flex; gap: 0.75rem; justify-content: flex-end; margin-top: 1.5rem; }
+
+.choices { border: 0; padding: 0; margin: 0; display: flex; flex-direction: column; gap: 0.4rem; }
+.choices legend { padding: 0; margin-bottom: 0.4rem; font-size: 0.875rem; font-weight: 600; color: var(--ink-soft); }
+
+/* Each option carries a sentence about what it does to the student, so the
+   choice is made with its consequence visible rather than after it. A dropdown
+   would hide all four behind one word. */
+.choice {
+  display: flex; align-items: flex-start; gap: 0.65rem;
+  padding: 0.7rem 0.8rem;
+  border: 1px solid var(--line); border-radius: var(--r-md);
+  cursor: pointer;
+}
+.choice:hover { border-color: var(--brand-light); }
+.choice input { margin-top: 0.2rem; flex-shrink: 0; accent-color: var(--brand); }
+.choice:has(input:checked) { border-color: var(--brand); background: var(--brand-tint); }
+.choice:has(input:focus-visible) { outline: 2px solid var(--brand); outline-offset: 2px; }
+.choice__body { display: flex; flex-direction: column; gap: 0.1rem; }
+.choice__name { font-weight: 600; font-size: 0.9375rem; }
+.choice__desc { font-size: 0.8125rem; color: var(--muted); line-height: 1.45; }
+
+/* ---- toasts ------------------------------------------------------------ */
+.toasts {
+  position: fixed; right: 1rem; bottom: 1rem; z-index: 60;
+  display: flex; flex-direction: column; gap: 0.5rem;
+  max-width: min(24rem, calc(100vw - 2rem));
+}
+
+.toast {
+  padding: 0.7rem 0.9rem;
+  border-radius: var(--r-md);
+  box-shadow: var(--shadow);
+  font-size: 0.9375rem;
+  background: var(--ink); color: #fff;
+}
+.toast--ok  { background: #065f46; }
+.toast--bad { background: #991b1b; }
+
+/* ---- responsive -------------------------------------------------------- */
+/* Below this width the sidebar becomes a top strip: a 15rem column on a phone
+   would leave nothing for the table it exists to navigate. */
+@media (max-width: 52rem) {
+  .shell { flex-direction: column; }
+  .side { width: 100%; flex-direction: row; align-items: center; gap: 0.75rem; padding: 0.75rem; overflow-x: auto; }
+  .side__brand { display: none; }
+  .side__nav { flex-direction: row; }
+  .side__item { width: auto; white-space: nowrap; }
+  .side__foot { margin: 0 0 0 auto; flex-direction: row; align-items: center; }
+  .side__who { display: none; }
+  .main { padding: 1rem; }
+  .search { flex-direction: column; }
+  .dialog__acts { flex-direction: column-reverse; }
+  .dialog__acts .btn { width: 100%; }
+}
+</style>
+</head>
+
+<body>
+
+<!-- ======================= SIGN IN ======================= -->
+<section id="gate" class="gate" hidden>
+  <div class="gate__card">
+    <div class="gate__brand">
+      <span class="gate__mark">W.H. Academy</span>
+      <span class="gate__sub">Administration</span>
+    </div>
+
+    <!--
+      Field names are adminEmail / adminSecret, and autocomplete is off.
+
+      Chrome matches saved credentials by ORIGIN. All GitHub Pages project sites
+      under whacademy692.github.io share one origin, so the student login's
+      saved credentials are visible to this page too — a form named
+      email/password with autocomplete="username" looked like that login, and
+      Chrome filled a saved Student ID into the Email box. Keep both if this
+      form is ever edited.
+    -->
+    <form id="signin" class="stack" autocomplete="off" novalidate>
+      <div class="field">
+        <label class="field__label" for="f-email">Email</label>
+        <input class="input" type="email" id="f-email" name="adminEmail"
+               autocomplete="off" autocapitalize="off" spellcheck="false" required>
+      </div>
+      <div class="field">
+        <label class="field__label" for="f-secret">Admin password</label>
+        <input class="input" type="password" id="f-secret" name="adminSecret"
+               autocomplete="new-password" required>
+      </div>
+      <button class="btn btn--primary btn--full btn--lg" type="submit">Sign in</button>
+    </form>
+
+    <p class="gate__note">
+      Separate from a student login. Signing in here does not sign you in as a student.
+    </p>
+  </div>
+</section>
+
+<!-- ======================= CONSOLE ======================= -->
+<div id="console" class="shell" hidden>
+
+  <aside class="side">
+    <div class="side__brand">
+      <span class="side__name">W.H. Academy</span>
+      <span class="side__tag">Admin</span>
+    </div>
+
+    <nav class="side__nav">
+      <button class="side__item is-active" data-view="students" type="button">
+        <svg viewBox="0 0 24 24" stroke-width="2" aria-hidden="true"><circle cx="12" cy="8" r="4"/><path stroke-linecap="round" d="M4 21c0-4 4-6 8-6s8 2 8 6"/></svg>
+        Students
+      </button>
+      <button class="side__item" data-view="overview" type="button">
+        <svg viewBox="0 0 24 24" stroke-width="2" aria-hidden="true"><path stroke-linecap="round" stroke-linejoin="round" d="M4 20V10M10 20V4M16 20v-7M22 20H2"/></svg>
+        Overview
+      </button>
+    </nav>
+
+    <div class="side__foot">
+      <span class="side__who" id="who"></span>
+      <button class="side__item" data-act="signout" type="button">
+        <svg viewBox="0 0 24 24" stroke-width="2" aria-hidden="true"><path stroke-linecap="round" stroke-linejoin="round" d="M9 21H5a2 2 0 01-2-2V5a2 2 0 012-2h4M16 17l5-5-5-5M21 12H9"/></svg>
+        Sign out
+      </button>
+    </div>
+  </aside>
+
+  <main class="main">
+
+    <section data-panel="students">
+      <header class="head">
+        <div>
+          <h1 class="head__title">Students</h1>
+          <p class="head__sub">Changing a status here writes it into the enrollment sheet, exactly as typing it there would.</p>
+        </div>
+      </header>
+
+      <form id="search" class="search" novalidate>
+        <label class="sr-only" for="f-query">Search students</label>
+        <div class="search__box">
+          <svg viewBox="0 0 24 24" stroke-width="2" aria-hidden="true"><circle cx="11" cy="11" r="7"/><path stroke-linecap="round" d="M20 20l-3.5-3.5"/></svg>
+          <input class="input search__input" type="search" id="f-query" name="query"
+                 placeholder="Name, email, or Student ID — leave empty to list everyone" autocomplete="off">
+        </div>
+        <button class="btn btn--primary" type="submit">Search</button>
+      </form>
+
+      <div id="results" aria-live="polite"></div>
+    </section>
+
+    <section data-panel="overview" hidden>
+      <header class="head">
+        <div>
+          <h1 class="head__title">Overview</h1>
+          <p class="head__sub">Read straight from the enrollment sheet.</p>
+        </div>
+        <button class="btn btn--quiet btn--sm" data-act="refresh" type="button">Refresh</button>
+      </header>
+      <div id="stats"></div>
+    </section>
+
+  </main>
+</div>
+
+<!-- ======================= STATUS DIALOG ======================= -->
+<div id="dialog" class="backdrop" hidden>
+  <div class="dialog" role="dialog" aria-modal="true" aria-labelledby="dlg-title">
+    <h2 id="dlg-title">Change status</h2>
+    <form id="status-form" class="stack" novalidate>
+      <p class="dialog__who">
+        <strong id="dlg-name">This student</strong>
+        <span class="cell-sub" id="dlg-id"></span>
+      </p>
+
+      <fieldset class="choices">
+        <legend>New status</legend>
+
+        <label class="choice">
+          <input type="radio" name="status" value="Active">
+          <span class="choice__body">
+            <span class="choice__name">Active</span>
+            <span class="choice__desc">Can log in. If no Student ID exists yet, one is created and emailed.</span>
+          </span>
+        </label>
+
+        <label class="choice">
+          <input type="radio" name="status" value="Pending">
+          <span class="choice__body">
+            <span class="choice__name">Pending</span>
+            <span class="choice__desc">Not activated yet. Cannot log in.</span>
+          </span>
+        </label>
+
+        <label class="choice">
+          <input type="radio" name="status" value="Suspended">
+          <span class="choice__body">
+            <span class="choice__name">Suspended</span>
+            <span class="choice__desc">Blocked from logging in. Account and progress are kept.</span>
+          </span>
+        </label>
+
+        <label class="choice">
+          <input type="radio" name="status" value="Expired">
+          <span class="choice__body">
+            <span class="choice__name">Expired</span>
+            <span class="choice__desc">No longer enrolled. Blocked from logging in, nothing deleted.</span>
+          </span>
+        </label>
+      </fieldset>
+
+      <div class="field">
+        <label class="field__label" for="f-reason">Reason</label>
+        <input class="input" type="text" id="f-reason" name="reason" placeholder="e.g. fees pending for August">
+        <span class="field__hint">Added to the row's admin notes, so you know why later.</span>
+      </div>
+
+      <div class="dialog__acts">
+        <button class="btn btn--quiet" type="button" data-act="close">Cancel</button>
+        <button class="btn btn--primary" type="submit">Save status</button>
+      </div>
+    </form>
+  </div>
+</div>
+
+<div class="toasts" id="toasts" aria-live="polite" aria-atomic="false"></div>
+
+<script>
+(function () {
+  'use strict';
+
+  // ==========================================================================
+  // CONFIG — see the note at the top of this file. These two values also live
+  // in the student site's assets/js/api.js. Change both together.
+  // ==========================================================================
+  var API_BASE_URL = 'https://script.google.com/macros/s/AKfycbxjaqW5hmUk6B5gYW3hRjAfsPrbrdZB4a3B3VfJRvfKcfepz4WPYIX_aCVKS-STmiwQIA/exec';
+  var API_KEY = 'Jdb-iJByoQ-WA0UwlQrorQOH77buDQjepPH0y2SsDyo';
+
+  // The admin session is stored under its own key, never the student site's
+  // session_token. All GitHub Pages project sites on whacademy692.github.io
+  // share one origin and therefore one localStorage, so both sessions coexist
+  // here: signing out of one leaves the other alone, and you can be signed into
+  // the panel and a student account at the same time to check what they see.
+  var TOKEN_KEY = 'wha:admin_token';
+
+  var STATUSES = ['Active', 'Pending', 'Suspended', 'Expired'];
+
+  var results = [];   // rows currently on screen
+  var pendingRow = null;
+
+  // ---------------------------------------------------------------- helpers
+  function qs(sel) { return document.querySelector(sel); }
+  function qsa(sel) { return Array.prototype.slice.call(document.querySelectorAll(sel)); }
+
+  function getToken() {
+    try { return JSON.parse(localStorage.getItem(TOKEN_KEY)); } catch (e) { return null; }
+  }
+  function setToken(v) {
+    try { localStorage.setItem(TOKEN_KEY, JSON.stringify(v)); } catch (e) { /* private mode */ }
+  }
+  function clearToken() {
+    try { localStorage.removeItem(TOKEN_KEY); } catch (e) { /* private mode */ }
+  }
+
+  // Every value below arrives from a Google Sheet that people type into by
+  // hand, so it is treated as text and never as markup.
+  function esc(v) {
+    return String(v == null ? '' : v)
+      .replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;')
+      .replace(/"/g, '&quot;').replace(/'/g, '&#39;');
+  }
+
+  function toast(message, kind) {
+    var host = qs('#toasts');
+    var el = document.createElement('div');
+    el.className = 'toast' + (kind ? ' toast--' + kind : '');
+    el.textContent = message;
+    host.appendChild(el);
+    setTimeout(function () { el.remove(); }, kind === 'bad' ? 6000 : 4000);
+  }
+
+  function busy(button, isBusy) {
+    if (!button) return;
+    button.disabled = isBusy;
+    button.setAttribute('aria-busy', isBusy ? 'true' : 'false');
+  }
+
+  /**
+   * One request to the backend.
+   *
+   * Content-Type is text/plain deliberately: that keeps this a "simple"
+   * cross-origin request, so the browser sends it without a CORS preflight.
+   * Apps Script cannot answer a preflight, so application/json would fail.
+   */
+  function call(operation, params) {
+    var body = { operation: operation, apiKey: API_KEY };
+    Object.keys(params || {}).forEach(function (k) { body[k] = params[k]; });
+
+    return fetch(API_BASE_URL, {
+      method: 'POST',
+      headers: { 'Content-Type': 'text/plain;charset=utf-8' },
+      body: JSON.stringify(body)
+    })
+    .then(function (res) { return res.json(); })
+    .then(function (payload) {
+      if (payload && payload.success) return payload.data || {};
+      var err = new Error((payload && payload.error && payload.error.message) || 'Something went wrong.');
+      err.code = payload && payload.error && payload.error.code;
+      throw err;
+    });
+  }
+
+  function authed(operation, params) {
+    var p = params || {};
+    p.token = getToken();
+    return call(operation, p);
+  }
+
+  function isAuthError(err) {
+    var c = err && err.code;
+    return c === 'AUTH_001' || c === 'AUTH_002' || c === 'AUTH_003' || c === 'AUTH_004';
+  }
+
+  function fail(err, fallback) {
+    if (isAuthError(err)) { endSession('Your admin session has ended. Please sign in again.'); return; }
+    toast((err && err.message) || fallback, 'bad');
+  }
+
+  function show(which) {
+    qs('#gate').hidden = which !== 'gate';
+    qs('#console').hidden = which !== 'console';
+  }
+
+  function endSession(message) {
+    clearToken();
+    results = [];
+    qs('#results').innerHTML = '';
+    qs('#stats').innerHTML = '';
+    show('gate');
+    if (message) toast(message, 'bad');
+  }
+
+  // -------------------------------------------------------------- rendering
+  function normalizeStatus(status) {
+    var raw = String(status || '').trim();
+    // Statuses are read trimmed and case-insensitively throughout the backend,
+    // so a hand-typed "active " must display as Active here too.
+    for (var i = 0; i < STATUSES.length; i++) {
+      if (STATUSES[i].toLowerCase() === raw.toLowerCase()) return STATUSES[i];
+    }
+    return raw || 'Pending';
+  }
+
+  function badgeFor(status) {
+    switch (normalizeStatus(status)) {
+      case 'Active': return 'badge--ok';
+      case 'Suspended': return 'badge--bad';
+      case 'Expired': return 'badge--neutral';
+      default: return 'badge--warn';
+    }
+  }
+
+  function renderStats(stats) {
+    var host = qs('#stats');
+    if (!stats) { host.innerHTML = ''; return; }
+
+    var byStatus = stats.byStatus || {};
+    var byClass = stats.byClassLevel || {};
+
+    function tile(value, label) {
+      return '<div class="tile"><span class="tile__value">' + esc(value) +
+             '</span><span class="tile__label">' + esc(label) + '</span></div>';
+    }
+
+    var tiles = tile(stats.totalEnrollments || 0, 'Total enrolled');
+    Object.keys(byStatus).sort().forEach(function (s) { tiles += tile(byStatus[s], s); });
+
+    var rows = Object.keys(byClass).sort().map(function (level) {
+      return '<li class="bar"><span>Class ' + esc(level) + '</span>' +
+             '<span class="bar__value">' + esc(byClass[level]) + '</span></li>';
+    }).join('');
+
+    host.innerHTML = '<div class="tiles">' + tiles + '</div>' +
+      (rows ? '<div class="panel"><h2 class="panel__title">By class</h2><ul class="bars">' + rows + '</ul></div>' : '');
+  }
+
+  function renderResults(list, query) {
+    var host = qs('#results');
+    results = Array.isArray(list) ? list : [];
+
+    if (!results.length) {
+      host.innerHTML = '<div class="empty"><h2>No students matched</h2><p>' +
+        (query ? 'Nothing found for &ldquo;' + esc(query) + '&rdquo;. Try part of a name, an email, or a Student ID.'
+               : 'There are no enrollment rows yet.') + '</p></div>';
+      return;
+    }
+
+    var rows = results.map(function (s) {
+      var sid = String(s.studentId || '').trim();
+      var status = normalizeStatus(s.status);
+      // Addressed by Student ID when it has one, by enrollment ID when it does
+      // not — a row awaiting activation has no Student ID yet.
+      var key = sid || String(s.enrollmentId || '');
+
+      // Only meaningful once an ID exists: before that, "no account" is simply
+      // where everyone starts and says nothing worth flagging.
+      var account = !sid ? '<span class="muted">&mdash;</span>'
+        : s.hasAccount ? '<span class="dot dot--ok">Registered</span>'
+        : '<span class="dot dot--warn">No account yet</span>';
+
+      return '<tr>' +
+        '<td><div class="cell-name">' + esc(s.fullName || '—') + '</div>' +
+        '<div class="cell-sub">' + esc(s.email || '') + '</div></td>' +
+        '<td class="cell-id">' + (sid ? esc(sid) : '<span class="muted">not issued</span>') + '</td>' +
+        '<td>' + esc(s.enrolledScope || '—') + '</td>' +
+        '<td>' + account + '</td>' +
+        '<td><span class="badge ' + badgeFor(status) + '">' + esc(status) + '</span></td>' +
+        '<td class="cell-act"><button class="btn btn--secondary btn--sm" data-act="status" data-key="' +
+        esc(key) + '">Change status</button></td></tr>';
+    }).join('');
+
+    host.innerHTML =
+      '<div class="table-wrap"><table>' +
+      '<thead><tr><th>Student</th><th>Student ID</th><th>Scope</th><th>Account</th><th>Status</th><th></th></tr></thead>' +
+      '<tbody>' + rows + '</tbody></table></div>' +
+      '<p class="count">' + results.length + ' shown</p>';
+  }
+
+  // ---------------------------------------------------------------- actions
+  function loadStats() {
+    return authed('admin/statistics', {})
+      .then(renderStats)
+      .catch(function (err) {
+        // Counts are a nicety; the console stays usable without them. An auth
+        // failure still ends the session.
+        if (isAuthError(err)) fail(err);
+      });
+  }
+
+  function runSearch(query, button) {
+    busy(button, true);
+    return authed('admin/searchStudents', { query: query })
+      .then(function (data) { renderResults((data && data.results) || [], query); })
+      .catch(function (err) { fail(err, 'Could not load students. Please try again.'); })
+      .then(function () { busy(button, false); });
+  }
+
+  function refresh() {
+    var input = qs('#f-query');
+    return runSearch(input ? input.value.trim() : '', null);
+  }
+
+  function openDialog(key) {
+    var student = null;
+    for (var i = 0; i < results.length; i++) {
+      var s = results[i];
+      if (String(s.studentId || '').trim() === key || String(s.enrollmentId || '') === key) { student = s; break; }
+    }
+    if (!student) return;
+
+    pendingRow = key;
+    var sid = String(student.studentId || '').trim();
+    qs('#dlg-name').textContent = student.fullName || key;
+    qs('#dlg-id').textContent = sid || 'Student ID not issued yet';
+    qs('#f-reason').value = '';
+
+    // Pre-select where the student actually is, so the dialog opens showing the
+    // truth rather than an empty choice.
+    var current = normalizeStatus(student.status);
+    qsa('#status-form input[name="status"]').forEach(function (r) { r.checked = r.value === current; });
+
+    qs('#dialog').hidden = false;
+    var checked = qs('#status-form input[name="status"]:checked');
+    (checked || qs('#status-form input[name="status"]')).focus();
+  }
+
+  function closeDialog() {
+    pendingRow = null;
+    qs('#dialog').hidden = true;
+  }
+
+  function submitStatus(event) {
+    event.preventDefault();
+    if (!pendingRow) { closeDialog(); return; }
+
+    var form = event.target;
+    var chosen = form.querySelector('input[name="status"]:checked');
+    if (!chosen) { toast('Choose a status first.', 'bad'); return; }
+
+    var reason = form.reason.value.trim();
+    var button = form.querySelector('[type="submit"]');
+    var key = pendingRow;
+
+    busy(button, true);
+    authed('admin/setStatus', { rowKey: key, status: chosen.value, reason: reason })
+      .then(function (data) {
+        closeDialog();
+        // The backend reports a partial outcome when the status saved but
+        // Student ID generation failed. Say so plainly, not a blanket "Saved".
+        if (data && data.warning) {
+          toast(data.warning, 'bad');
+        } else if (chosen.value === 'Active' && data && data.studentId) {
+          toast('Set to Active. Student ID ' + data.studentId + ' is ready.', 'ok');
+        } else {
+          toast('Status set to ' + chosen.value + '.', 'ok');
+        }
+        return Promise.all([refresh(), loadStats()]);
+      })
+      .catch(function (err) { fail(err, 'Could not change the status.'); })
+      .then(function () { busy(button, false); });
+  }
+
+  function submitSignIn(event) {
+    event.preventDefault();
+    var form = event.target;
+    // Field names are adminEmail / adminSecret — see the note in the markup
+    // explaining why they are not email / password.
+    var email = form.adminEmail.value.trim();
+    var secret = form.adminSecret.value;
+    var button = form.querySelector('[type="submit"]');
+
+    if (!email || !secret) { toast('Enter both your email and your admin password.', 'bad'); return; }
+
+    busy(button, true);
+    call('admin/login', { email: email, sharedSecret: secret })
+      .then(function (data) {
+        if (!data || !data.token) throw new Error('The server did not return a session.');
+        setToken(data.token);
+        form.reset();
+        enterConsole(email);
+      })
+      // The backend answers "Not authorized." for both a wrong email and a
+      // wrong password, deliberately — it does not reveal which. Pass that
+      // through rather than inventing something friendlier and less true.
+      .catch(function (err) { toast((err && err.message) || 'Could not sign in.', 'bad'); })
+      .then(function () { busy(button, false); });
+  }
+
+  function showView(name) {
+    qsa('[data-panel]').forEach(function (p) { p.hidden = p.dataset.panel !== name; });
+    qsa('[data-view]').forEach(function (b) { b.classList.toggle('is-active', b.dataset.view === name); });
+    if (name === 'overview') loadStats();
+  }
+
+  function enterConsole(email) {
+    if (email) qs('#who').textContent = email;
+    show('console');
+    showView('students');
+    // Open on the full list — the panel is most useful when it already shows
+    // everyone rather than an empty screen waiting to be searched.
+    runSearch('', null);
+    loadStats();
+  }
+
+  // ------------------------------------------------------------------- init
+  qs('#signin').addEventListener('submit', submitSignIn);
+  qs('#search').addEventListener('submit', function (e) {
+    e.preventDefault();
+    runSearch(e.target.query.value.trim(), e.target.querySelector('[type="submit"]'));
+  });
+  qs('#status-form').addEventListener('submit', submitStatus);
+
+  // Row buttons are rebuilt on every search, so listen once on the container.
+  qs('#results').addEventListener('click', function (e) {
+    var b = e.target.closest('[data-act="status"]');
+    if (b) openDialog(b.dataset.key);
+  });
+
+  document.addEventListener('click', function (e) {
+    var t = e.target.closest('[data-act], [data-view]');
+    if (!t) return;
+    if (t.dataset.act === 'signout') endSession();
+    if (t.dataset.act === 'close') closeDialog();
+    if (t.dataset.act === 'refresh') loadStats();
+    if (t.dataset.view) showView(t.dataset.view);
+  });
+
+  document.addEventListener('keydown', function (e) {
+    if (e.key === 'Escape' && !qs('#dialog').hidden) closeDialog();
+  });
+
+  // A held token decides which screen opens. It is not proof of anything on its
+  // own — every route re-checks it server-side — it just avoids showing a
+  // sign-in form to someone already signed in.
+  if (getToken()) enterConsole(null); else show('gate');
+})();
+</script>
+
+</body>
+</html>
