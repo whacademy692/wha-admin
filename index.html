@@ -263,7 +263,14 @@ tbody tr:last-child td { border-bottom: 0; }
 tbody tr:hover { background: #fafbfc; }
 
 .cell-name { font-weight: 600; }
-.cell-sub  { font-size: 0.8125rem; color: var(--muted); overflow-wrap: anywhere; }
+
+/* Emails were breaking mid-word ("...gmail.co / m") because the first column
+   was too narrow to hold them. Widening it fixes the cause; break-word then
+   only splits a string that genuinely cannot fit, and prefers a sensible
+   break point when one exists. */
+th:first-child, td:first-child { min-width: 15rem; }
+
+.cell-sub  { font-size: 0.8125rem; color: var(--muted); overflow-wrap: break-word; }
 .cell-id   { font-family: var(--mono); font-size: 0.8125rem; font-variant-numeric: tabular-nums; white-space: nowrap; }
 .cell-act  { text-align: right; white-space: nowrap; }
 
@@ -691,15 +698,33 @@ tbody tr:hover { background: #fafbfc; }
     var byStatus = stats.byStatus || {};
     var byClass = stats.byClassLevel || {};
 
+    // Merge statuses that differ only by case or stray whitespace.
+    //
+    // The backend counts by the RAW cell value, and the enrollment sheet is
+    // typed into by hand — so "Active", "active" and "active " (trailing space)
+    // arrive as three separate keys and rendered as three separate tiles saying
+    // the same thing. Every status read in the backend is trimmed and
+    // case-insensitive, so those students really are all Active; only the
+    // count was split. normalizeStatus collapses them, exactly as the students
+    // table already does, so the two views cannot disagree.
+    var merged = {};
+    Object.keys(byStatus).forEach(function (raw) {
+      var key = normalizeStatus(raw);
+      merged[key] = (merged[key] || 0) + (Number(byStatus[raw]) || 0);
+    });
+
     function tile(value, label) {
       return '<div class="tile"><span class="tile__value">' + esc(value) +
              '</span><span class="tile__label">' + esc(label) + '</span></div>';
     }
 
     var tiles = tile(stats.totalEnrollments || 0, 'Total enrolled');
-    Object.keys(byStatus).sort().forEach(function (s) { tiles += tile(byStatus[s], s); });
+    Object.keys(merged).sort().forEach(function (s) { tiles += tile(merged[s], s); });
 
-    var rows = Object.keys(byClass).sort().map(function (level) {
+    var rows = Object.keys(byClass).sort(function (a, b) {
+      // Numeric sort, so Class 9 comes before Class 10 rather than after it.
+      return (Number(a) || 0) - (Number(b) || 0);
+    }).map(function (level) {
       return '<li class="bar"><span>Class ' + esc(level) + '</span>' +
              '<span class="bar__value">' + esc(byClass[level]) + '</span></li>';
     }).join('');
