@@ -6,6 +6,22 @@
 <title>Admin — W.H. Academy</title>
 <meta name="theme-color" content="#3730a3">
 <meta name="robots" content="noindex, nofollow">
+<!-- Audit S2: per-page CSP. frame-ancestors 'none' stops this admin panel from
+     being framed (clickjacking). 'unsafe-inline' is required — the whole panel is
+     one inline <script> + inline styles. challenges.cloudflare.com = Turnstile
+     (S1); script.google.com = the API. -->
+<meta http-equiv="Content-Security-Policy" content="default-src 'self'; base-uri 'self'; object-src 'none'; frame-ancestors 'none'; script-src 'self' 'unsafe-inline' https://challenges.cloudflare.com; style-src 'self' 'unsafe-inline'; img-src 'self' data:; connect-src 'self' https://script.google.com https://challenges.cloudflare.com; frame-src https://challenges.cloudflare.com">
+<!-- Audit S1: Cloudflare Turnstile on admin sign-in. OFF until you paste the SITE
+     key below (and set TURNSTILE_SECRET_KEY + FLAG_CAPTCHA on the backend). -->
+<script>
+  window.WHA_TURNSTILE_SITE_KEY = ''; /* <-- paste Cloudflare Turnstile SITE key here to enable CAPTCHA */
+  window.__whaTurnstileReady = false;
+  window.whaTurnstileOnload = function () {
+    window.__whaTurnstileReady = true;
+    if (typeof window.whaRenderAdminCaptcha === 'function') window.whaRenderAdminCaptcha();
+  };
+</script>
+<script src="https://challenges.cloudflare.com/turnstile/v0/api.js?onload=whaTurnstileOnload&render=explicit" async defer></script>
 
 <!--
   ============================================================================
@@ -516,6 +532,8 @@ select.input { appearance: auto; background: var(--surface); }
         <span class="field__hint" id="code-hint">Emailed to you. It expires in 10 minutes.</span>
       </div>
 
+      <div id="admin-captcha" style="margin: 0.75rem 0;"></div>
+
       <button class="btn btn--primary btn--full btn--lg" type="submit" id="signin-btn">Sign in</button>
     </form>
 
@@ -841,14 +859,41 @@ select.input { appearance: auto; background: var(--surface); }
   function qs(sel) { return document.querySelector(sel); }
   function qsa(sel) { return Array.prototype.slice.call(document.querySelectorAll(sel)); }
 
-  function getToken() {
-    try { return JSON.parse(localStorage.getItem(TOKEN_KEY)); } catch (e) { return null; }
-  }
-  function setToken(v) {
-    try { localStorage.setItem(TOKEN_KEY, JSON.stringify(v)); } catch (e) { /* private mode */ }
-  }
+  // Audit S10: the admin token is kept in MEMORY ONLY, never in localStorage,
+  // so a future XSS on this page cannot read it. Trade-off: a page reload drops
+  // the session and you sign in again — but the device stays trusted (30-day
+  // AdminSessions registry), so it is just email + password, no OTP. The device
+  // id (DEVICE_KEY) stays in localStorage: it is not a credential and is useless
+  // without the password + the trust registry.
+  // Audit S1: Turnstile helper for the admin sign-in. Inert unless a SITE key
+  // is set in the head config.
+  var AdminCaptcha = (function () {
+    var SITE_KEY = window.WHA_TURNSTILE_SITE_KEY || '';
+    var widgetId;
+    return {
+      enabled: function () { return !!SITE_KEY; },
+      render: function () {
+        if (!SITE_KEY || !window.turnstile || widgetId !== undefined) return;
+        try { widgetId = window.turnstile.render('#admin-captcha', { sitekey: SITE_KEY }); } catch (e) { /* not ready */ }
+      },
+      token: function () {
+        if (!SITE_KEY || !window.turnstile || widgetId === undefined) return '';
+        try { return window.turnstile.getResponse(widgetId) || ''; } catch (e) { return ''; }
+      },
+      reset: function () {
+        if (!SITE_KEY || !window.turnstile || widgetId === undefined) return;
+        try { window.turnstile.reset(widgetId); } catch (e) { /* ignore */ }
+      }
+    };
+  })();
+  window.whaRenderAdminCaptcha = function () { AdminCaptcha.render(); };
+
+  var adminTokenInMemory = null;
+  function getToken() { return adminTokenInMemory; }
+  function setToken(v) { adminTokenInMemory = v; }
   function clearToken() {
-    try { localStorage.removeItem(TOKEN_KEY); } catch (e) { /* private mode */ }
+    adminTokenInMemory = null;
+    try { localStorage.removeItem(TOKEN_KEY); } catch (e) { /* clear any token persisted by an earlier version */ }
   }
 
   // Every value below arrives from a Google Sheet that people type into by
@@ -1167,6 +1212,13 @@ select.input { appearance: auto; background: var(--surface); }
       deviceId: deviceId(), deviceLabel: deviceLabel()
     };
 
+    // Audit S1: only admin/login is CAPTCHA-gated (verifyOtp is already code-gated).
+    if (!code && AdminCaptcha.enabled()) {
+      var capToken = AdminCaptcha.token();
+      if (!capToken) { toast('Please complete the verification check.', 'bad'); return; }
+      payload.captchaToken = capToken;
+    }
+
     busy(button, true);
 
     var request = code
@@ -1194,7 +1246,7 @@ select.input { appearance: auto; background: var(--surface); }
       // wrong password, deliberately — it does not reveal which. Pass that
       // through rather than inventing something friendlier and less true.
       .catch(function (err) { toast((err && err.message) || 'Could not sign in.', 'bad'); })
-      .then(function () { busy(button, false); });
+      .then(function () { busy(button, false); AdminCaptcha.reset(); /* audit S1: tokens are single-use */ });
   }
 
   /**
@@ -1549,6 +1601,7 @@ select.input { appearance: auto; background: var(--surface); }
 
   // ------------------------------------------------------------------- init
   wirePapers();
+  if (window.__whaTurnstileReady) AdminCaptcha.render(); // audit S1 (onload covers the other order)
   qs('#signin').addEventListener('submit', submitSignIn);
   qs('#search').addEventListener('submit', function (e) {
     e.preventDefault();
