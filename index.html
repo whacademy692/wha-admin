@@ -471,6 +471,28 @@ select.input { appearance: auto; background: var(--surface); }
 .pp-pill--active { background: #d9f5ea; color: var(--ok); }
 .pp-pill--draft { background: var(--line-soft); color: var(--ink-soft); }
 .pp-pill--past { background: #fdf0dc; color: var(--warn); }
+
+/* ---- Grading ---- */
+.gr-pill { font-size: 0.6875rem; font-weight: 700; padding: 3px 9px; border-radius: 999px; }
+.gr-pill--submitted { background: #fdf0dc; color: var(--warn); }
+.gr-pill--graded, .gr-pill--rechecked { background: #d9f5ea; color: var(--ok); }
+.gr-pill--recheckrequested { background: #fee2e2; color: var(--bad); }
+.gr-runningbox { text-align: right; flex-shrink: 0; }
+.gr-running { display: block; font-size: 1.25rem; font-weight: 800; color: var(--brand-deep); }
+.gr-q { border: 1px solid var(--line); border-radius: var(--r-lg); padding: 1rem; margin-bottom: 0.85rem; background: var(--surface); box-shadow: var(--shadow); }
+.gr-q__head { display: flex; align-items: baseline; gap: 0.6rem; margin-bottom: 0.5rem; }
+.gr-q__num { font-weight: 800; color: var(--brand); }
+.gr-q__type { font-size: 0.6875rem; text-transform: uppercase; letter-spacing: .04em; color: var(--muted); font-weight: 700; }
+.gr-q__text { font-weight: 600; margin: 0 0 0.5rem; }
+.gr-q__label { font-size: 0.75rem; font-weight: 700; text-transform: uppercase; letter-spacing: .04em; color: var(--muted); display: block; margin: 0.4rem 0 0.2rem; }
+.gr-q__ans { background: var(--brand-tint); border-radius: var(--r-md); padding: 0.55rem 0.7rem; white-space: pre-wrap; overflow-wrap: break-word; font-size: 0.9375rem; }
+.gr-q__ans--empty { background: var(--line-soft); color: var(--muted); font-style: italic; }
+.gr-q__correct { font-size: 0.8125rem; color: var(--ok); margin-top: 0.35rem; }
+.gr-q__grade { display: flex; flex-wrap: wrap; gap: 0.75rem; align-items: flex-end; margin-top: 0.65rem; padding-top: 0.65rem; border-top: 1px dashed var(--line); }
+.gr-q__marksfield { width: 130px; flex-shrink: 0; }
+.gr-q__corrfield { flex: 1; min-width: 200px; }
+.gr-mcqmark { display: flex; gap: 0.4rem; }
+.gr-mcqmark .btn { padding: 0.3rem 0.6rem; }
 @media (max-width: 520px) {
   .paper-acts { flex-direction: column-reverse; } .paper-acts .btn { width: 100%; }
   .q-mini { margin-left: 0; }
@@ -564,6 +586,10 @@ select.input { appearance: auto; background: var(--surface); }
       <button class="side__item" data-view="papers" type="button">
         <svg viewBox="0 0 24 24" stroke-width="2" aria-hidden="true"><path stroke-linecap="round" stroke-linejoin="round" d="M12 3l7 3v5c0 4.5-3 7.5-7 9-4-1.5-7-4.5-7-9V6l7-3z"/><path stroke-linecap="round" stroke-linejoin="round" d="M9.5 12l1.8 1.8L15 9.8"/></svg>
         Boss Papers
+      </button>
+      <button class="side__item" data-view="grading" type="button">
+        <svg viewBox="0 0 24 24" stroke-width="2" aria-hidden="true"><path stroke-linecap="round" stroke-linejoin="round" d="M5 4h11l3 3v13H5z"/><path stroke-linecap="round" stroke-linejoin="round" d="M8 12l2.5 2.5L16 9"/></svg>
+        Grading
       </button>
       <button class="side__item" data-view="devices" type="button">
         <svg viewBox="0 0 24 24" stroke-width="2" aria-hidden="true"><rect x="2" y="4" width="14" height="11" rx="2"/><rect x="17" y="9" width="5" height="11" rx="1.5"/><path stroke-linecap="round" d="M6 19h6"/></svg>
@@ -687,6 +713,61 @@ select.input { appearance: auto; background: var(--surface); }
       <div class="paper-existing">
         <h2 class="panel__title">Existing papers</h2>
         <div id="ba-papers-list"></div>
+      </div>
+    </section>
+
+    <section data-panel="grading" hidden>
+      <!-- Stage 1: pick a paper to grade -->
+      <div id="gr-stage-papers">
+        <header class="head">
+          <div>
+            <h1 class="head__title">Grading</h1>
+            <p class="head__sub">Pick a paper to see who has submitted it, then grade each paper question by question. Releasing a result makes the marks and feedback visible to that student.</p>
+          </div>
+          <button class="btn btn--quiet btn--sm" data-act="gr-refresh-papers" type="button">Refresh</button>
+        </header>
+        <div class="panel">
+          <div id="gr-papers-list"><p class="muted">Loading…</p></div>
+        </div>
+      </div>
+
+      <!-- Stage 2: submissions for the chosen paper -->
+      <div id="gr-stage-subs" hidden>
+        <header class="head">
+          <div>
+            <button class="btn btn--quiet btn--sm" data-act="gr-back-papers" type="button">‹ All papers</button>
+            <h1 class="head__title" id="gr-subs-title" style="margin-top:.5rem;">Submissions</h1>
+            <p class="head__sub" id="gr-subs-sub"></p>
+          </div>
+          <button class="btn btn--quiet btn--sm" data-act="gr-refresh-subs" type="button">Refresh</button>
+        </header>
+        <div class="panel">
+          <div id="gr-subs-list"><p class="muted">Loading…</p></div>
+        </div>
+      </div>
+
+      <!-- Stage 3: grade one submission -->
+      <div id="gr-stage-grade" hidden>
+        <header class="head">
+          <div>
+            <button class="btn btn--quiet btn--sm" data-act="gr-back-subs" type="button">‹ Back to submissions</button>
+            <h1 class="head__title" id="gr-grade-title" style="margin-top:.5rem;">Grade paper</h1>
+            <p class="head__sub" id="gr-grade-sub"></p>
+          </div>
+          <div class="gr-runningbox"><span class="gr-running" id="gr-running">0 / 0</span><span class="cell-sub">awarded</span></div>
+        </header>
+        <div id="gr-grade-host"></div>
+        <div class="panel">
+          <div class="field">
+            <label class="field__label" for="gr-overall">Overall feedback <span class="muted">(optional — shown above the per-question marks)</span></label>
+            <textarea class="input" id="gr-overall" rows="3" placeholder="A short note on the whole paper…"></textarea>
+          </div>
+          <div class="paper-acts">
+            <button class="btn btn--quiet" type="button" data-act="gr-save-draft">Save draft (not shown to student)</button>
+            <button class="btn btn--primary" type="button" data-act="gr-release">Save &amp; release result</button>
+          </div>
+          <p class="field__hint" style="margin-top:.5rem;">A question left blank scores 0. You can never award more than a question is worth. Releasing sets the paper to Graded and shows the student their marks + feedback.</p>
+        </div>
       </div>
     </section>
 
@@ -1599,8 +1680,217 @@ select.input { appearance: auto; background: var(--surface); }
     renderQuestions();
   }
 
+  // ===================================================================
+  // GRADING — pick a paper → its submissions → grade one → release.
+  // Uses the three admin endpoints: listPapers, listSubmissions,
+  // submissionForGrading, gradeSubmission.
+  // ===================================================================
+  var grState = { paperId: null, paperTitle: '', submissionId: null, total: 0 };
+
+  function grLetter(i) { return String.fromCharCode(65 + Number(i)); }
+
+  function grShowStage(stage) {
+    qs('#gr-stage-papers').hidden = stage !== 'papers';
+    qs('#gr-stage-subs').hidden = stage !== 'subs';
+    qs('#gr-stage-grade').hidden = stage !== 'grade';
+  }
+
+  function loadGrading() {
+    grShowStage('papers');
+    var host = qs('#gr-papers-list');
+    host.innerHTML = '<p class="muted">Loading…</p>';
+    authed('bossbattle/admin/listPapers', {})
+      .then(function (data) { renderGrPapers((data && data.papers) || []); })
+      .catch(function (e) { host.innerHTML = ''; fail(e, 'Could not load papers.'); });
+  }
+
+  function renderGrPapers(list) {
+    var host = qs('#gr-papers-list');
+    if (!list.length) { host.innerHTML = '<div class="empty"><h2>No papers yet</h2><p>Create a paper in Boss Papers first.</p></div>'; return; }
+    var order = { Active: 0, Draft: 1, Past: 2 };
+    list.sort(function (a, b) {
+      return (order[a.status] == null ? 9 : order[a.status]) - (order[b.status] == null ? 9 : order[b.status]);
+    });
+    host.innerHTML = list.map(function (p) {
+      var pill = '<span class="pp-pill pp-pill--' + String(p.status).toLowerCase() + '">' + esc(p.status) + '</span>';
+      var meta = [esc(p.level), 'Class ' + esc(p.classLevel), (p.subject ? esc(p.subject) : ''), esc(p.questionCount) + ' Q', esc(p.totalMarks) + ' marks']
+        .filter(function (x) { return x; }).join(' · ');
+      return '<div class="pp-row"><div class="pp-row__main"><div class="pp-row__title">' + esc(p.title) + '</div>' +
+        '<div class="cell-sub">' + meta + '</div></div>' +
+        '<div class="pp-row__side">' + pill +
+        '<button class="btn btn--secondary btn--sm" data-act="gr-open-subs" data-paper="' + esc(p.paperId) + '" data-title="' + esc(p.title) + '">View submissions</button>' +
+        '</div></div>';
+    }).join('');
+  }
+
+  function openSubs(paperId, title) {
+    grState.paperId = paperId;
+    grState.paperTitle = title || '';
+    grShowStage('subs');
+    qs('#gr-subs-title').textContent = title || 'Submissions';
+    qs('#gr-subs-sub').textContent = '';
+    var host = qs('#gr-subs-list');
+    host.innerHTML = '<p class="muted">Loading…</p>';
+    authed('bossbattle/admin/listSubmissions', { paperId: paperId })
+      .then(function (data) { renderSubs((data && data.submissions) || []); })
+      .catch(function (e) { host.innerHTML = ''; fail(e, 'Could not load submissions.'); });
+  }
+
+  function renderSubs(list) {
+    var host = qs('#gr-subs-list');
+    var sub = qs('#gr-subs-sub');
+    if (sub) sub.textContent = list.length + ' submission' + (list.length === 1 ? '' : 's');
+    if (!list.length) { host.innerHTML = '<div class="empty"><h2>No submissions yet</h2><p>No student has submitted this paper.</p></div>'; return; }
+    host.innerHTML = list.map(function (s) {
+      var st = String(s.status || '').toLowerCase();
+      var pill = '<span class="gr-pill gr-pill--' + st + '">' + esc(s.status) + '</span>';
+      var isGraded = (s.status === 'Graded' || s.status === 'Rechecked');
+      var marks = (s.awardedMarks == null) ? '' : ('<span class="cell-sub">' + esc(s.awardedMarks) + ' / ' + esc(s.totalMarks) + '</span>');
+      var when = s.submittedAt ? ('<div class="cell-sub">Submitted ' + esc(s.submittedAt) + '</div>') : '';
+      var btn = '<button class="btn ' + (isGraded ? 'btn--quiet' : 'btn--primary') + ' btn--sm" data-act="gr-open-grade" data-sub="' + esc(s.submissionId) + '">' + (isGraded ? 'Review / edit' : 'Grade') + '</button>';
+      return '<div class="pp-row"><div class="pp-row__main"><div class="pp-row__title">' + esc(s.studentName || 'Student') +
+        ' <span class="cell-sub">' + esc(s.studentId) + '</span></div>' + when + '</div>' +
+        '<div class="pp-row__side">' + pill + marks + btn + '</div></div>';
+    }).join('');
+  }
+
+  function openGrade(submissionId) {
+    grShowStage('grade');
+    qs('#gr-grade-title').textContent = 'Grade paper';
+    qs('#gr-grade-sub').textContent = '';
+    var host = qs('#gr-grade-host');
+    host.innerHTML = '<p class="muted">Loading…</p>';
+    authed('bossbattle/admin/submissionForGrading', { paperId: grState.paperId, submissionId: submissionId })
+      .then(function (data) { renderGradeForm(data); })
+      .catch(function (e) { host.innerHTML = ''; fail(e, 'Could not open this submission.'); });
+  }
+
+  function grQuestionCard(item, i) {
+    var typeLabel = String(item.type || '').toUpperCase();
+    var ansHtml;
+    var correctHtml = '';
+    if (item.type === 'mcq') {
+      var opts = item.options || [];
+      var idx = (item.yourAnswer === '' || item.yourAnswer == null) ? null : Number(item.yourAnswer);
+      ansHtml = (idx == null)
+        ? '<div class="gr-q__ans gr-q__ans--empty">No answer given</div>'
+        : '<div class="gr-q__ans"><strong>' + grLetter(idx) + '.</strong> ' + esc(opts[idx] != null ? opts[idx] : '') + '</div>';
+      if (item.correctIndex != null && opts[item.correctIndex] != null) {
+        correctHtml = '<div class="gr-q__correct">✓ Correct: ' + grLetter(item.correctIndex) + '. ' + esc(opts[item.correctIndex]) + '</div>';
+      }
+    } else {
+      var val = (item.yourAnswer == null || item.yourAnswer === '') ? '' : String(item.yourAnswer);
+      ansHtml = val ? '<div class="gr-q__ans">' + esc(val) + '</div>' : '<div class="gr-q__ans gr-q__ans--empty">No answer given</div>';
+    }
+
+    // Pre-fill: keep an existing mark; otherwise auto-suggest MCQ from the
+    // correct index (grader can still override). Written answers start blank.
+    var marksVal = (item.awardedMarks == null) ? '' : item.awardedMarks;
+    if (item.type === 'mcq' && item.awardedMarks == null && item.yourAnswer !== '' && item.yourAnswer != null && item.correctIndex != null) {
+      marksVal = (Number(item.yourAnswer) === Number(item.correctIndex)) ? item.marks : 0;
+    }
+
+    var mcqQuick = (item.type === 'mcq')
+      ? '<div class="gr-mcqmark"><button class="btn btn--quiet btn--sm" type="button" data-act="gr-mcq-full">Full</button>' +
+        '<button class="btn btn--quiet btn--sm" type="button" data-act="gr-mcq-zero">0</button></div>'
+      : '';
+
+    return '<div class="gr-q" data-qid="' + esc(item.qId) + '">' +
+        '<div class="gr-q__head"><span class="gr-q__num">Q' + (i + 1) + '</span>' +
+          '<span class="gr-q__type">' + esc(typeLabel) + '</span>' +
+          '<span class="cell-sub" style="margin-left:auto;">out of ' + esc(item.marks) + '</span></div>' +
+        '<p class="gr-q__text">' + esc(item.text) + '</p>' +
+        '<span class="gr-q__label">Student\'s answer</span>' + ansHtml + correctHtml +
+        '<div class="gr-q__grade">' +
+          '<div class="gr-q__marksfield"><span class="gr-q__label">Marks</span>' +
+            '<input class="input gr-marks-input" type="number" min="0" max="' + esc(item.marks) + '" step="0.5" data-qid="' + esc(item.qId) + '" value="' + esc(marksVal) + '"></div>' +
+          mcqQuick +
+          '<div class="gr-q__corrfield"><span class="gr-q__label">Feedback / correction</span>' +
+            '<textarea class="input gr-corr-input" rows="2" data-corr="' + esc(item.qId) + '" placeholder="What was wrong / why marks were cut (optional)">' + esc(item.correction || '') + '</textarea></div>' +
+        '</div>' +
+      '</div>';
+  }
+
+  function renderGradeForm(d) {
+    grState.submissionId = d.submissionId;
+    grState.total = Number(d.totalMarks) || 0;
+    qs('#gr-grade-title').textContent = d.studentName || 'Student';
+    qs('#gr-grade-sub').textContent = esc(d.studentId) + ' · ' + (d.paperTitle || '') + ' · ' + grState.total + ' marks total' +
+      (d.gradedAt ? ' · last graded ' + d.gradedAt : '');
+    qs('#gr-overall').value = d.overallFeedback || '';
+    qs('#gr-grade-host').innerHTML = (d.items || []).map(grQuestionCard).join('');
+    grUpdateRunning();
+  }
+
+  function grUpdateRunning() {
+    var sum = 0;
+    qsa('#gr-grade-host .gr-marks-input').forEach(function (mi) {
+      var v = Number(mi.value) || 0;
+      var max = Number(mi.getAttribute('max')) || 0;
+      if (v < 0) v = 0;
+      if (v > max) v = max;
+      sum += v;
+    });
+    sum = Math.round(sum * 10) / 10;
+    var el = qs('#gr-running');
+    if (el) el.textContent = sum + ' / ' + (grState.total || 0);
+  }
+
+  function submitGrade(finalize, button) {
+    if (!grState.submissionId) return;
+    var grades = {};
+    qsa('#gr-grade-host .gr-q').forEach(function (card) {
+      var qid = card.getAttribute('data-qid');
+      var mi = card.querySelector('.gr-marks-input');
+      var ci = card.querySelector('.gr-corr-input');
+      var m = (mi && mi.value !== '') ? Number(mi.value) : 0;
+      grades[qid] = { marks: m, correction: ci ? ci.value : '' };
+    });
+    var overall = qs('#gr-overall').value;
+    busy(button, true);
+    authed('bossbattle/admin/gradeSubmission', {
+      submissionId: grState.submissionId, grades: grades, overallFeedback: overall, finalize: finalize
+    })
+      .then(function () {
+        toast(finalize ? 'Result released to the student.' : 'Draft saved (not shown to the student).', 'ok');
+        openSubs(grState.paperId, grState.paperTitle);
+      })
+      .catch(function (e) { fail(e, 'Could not save the grade.'); })
+      .then(function () { busy(button, false); });
+  }
+
+  function onGradingClick(e) {
+    var t = e.target.closest ? e.target.closest('[data-act]') : null;
+    if (!t) return;
+    var act = t.dataset.act;
+    if (act === 'gr-refresh-papers') return loadGrading();
+    if (act === 'gr-open-subs') return openSubs(t.getAttribute('data-paper'), t.getAttribute('data-title'));
+    if (act === 'gr-back-papers') return grShowStage('papers');
+    if (act === 'gr-refresh-subs') return openSubs(grState.paperId, grState.paperTitle);
+    if (act === 'gr-open-grade') return openGrade(t.getAttribute('data-sub'));
+    if (act === 'gr-back-subs') return grShowStage('subs');
+    if (act === 'gr-mcq-full' || act === 'gr-mcq-zero') {
+      var card = t.closest('.gr-q');
+      var mi = card && card.querySelector('.gr-marks-input');
+      if (mi) { mi.value = (act === 'gr-mcq-full') ? mi.getAttribute('max') : '0'; grUpdateRunning(); }
+      return;
+    }
+    if (act === 'gr-save-draft') return submitGrade(false, t);
+    if (act === 'gr-release') return submitGrade(true, t);
+  }
+
+  function wireGrading() {
+    var panel = qs('[data-panel="grading"]');
+    if (!panel) return;
+    panel.addEventListener('click', onGradingClick);
+    panel.addEventListener('input', function (e) {
+      if (e.target.classList && e.target.classList.contains('gr-marks-input')) grUpdateRunning();
+    });
+  }
+
   // ------------------------------------------------------------------- init
   wirePapers();
+  wireGrading();
   if (window.__whaTurnstileReady) AdminCaptcha.render(); // audit S1 (onload covers the other order)
   qs('#signin').addEventListener('submit', submitSignIn);
   qs('#search').addEventListener('submit', function (e) {
@@ -1631,7 +1921,10 @@ select.input { appearance: auto; background: var(--surface); }
     if (t.dataset.act === 'close') closeDialog();
     if (t.dataset.act === 'refresh') loadStats();
     if (t.dataset.act === 'refresh-papers') loadPapers();
-    if (t.dataset.view) showView(t.dataset.view);
+    if (t.dataset.view) {
+      showView(t.dataset.view);
+      if (t.dataset.view === 'grading') loadGrading();
+    }
   });
 
   document.addEventListener('keydown', function (e) {
