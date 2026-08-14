@@ -591,6 +591,10 @@ select.input { appearance: auto; background: var(--surface); }
         <svg viewBox="0 0 24 24" stroke-width="2" aria-hidden="true"><path stroke-linecap="round" stroke-linejoin="round" d="M5 4h11l3 3v13H5z"/><path stroke-linecap="round" stroke-linejoin="round" d="M8 12l2.5 2.5L16 9"/></svg>
         Grading
       </button>
+      <button class="side__item" data-view="teachers" type="button">
+        <svg viewBox="0 0 24 24" stroke-width="2" aria-hidden="true"><circle cx="9" cy="8" r="3.5"/><path stroke-linecap="round" d="M3 20c0-3.3 2.7-5 6-5s6 1.7 6 5"/><path stroke-linecap="round" d="M16 4.5a3.5 3.5 0 010 7M18 20c0-2.4-1-4-2.5-4.6"/></svg>
+        Teachers
+      </button>
       <button class="side__item" data-view="devices" type="button">
         <svg viewBox="0 0 24 24" stroke-width="2" aria-hidden="true"><rect x="2" y="4" width="14" height="11" rx="2"/><rect x="17" y="9" width="5" height="11" rx="1.5"/><path stroke-linecap="round" d="M6 19h6"/></svg>
         Devices
@@ -768,6 +772,47 @@ select.input { appearance: auto; background: var(--surface); }
           </div>
           <p class="field__hint" style="margin-top:.5rem;">A question left blank scores 0. You can never award more than a question is worth. Releasing sets the paper to Graded and shows the student their marks + feedback.</p>
         </div>
+      </div>
+    </section>
+
+    <section data-panel="teachers" hidden>
+      <header class="head">
+        <div>
+          <h1 class="head__title">Teachers</h1>
+          <p class="head__sub">Create teacher accounts and assign subjects. A teacher can only see and grade Boss-Battle papers for their own subjects. Teachers sign in and grade on the separate <a href="./teacher.html">Teacher panel</a>.</p>
+        </div>
+        <button class="btn btn--quiet btn--sm" data-act="gr-refresh-teachers" type="button">Refresh</button>
+      </header>
+
+      <form id="tc-form" class="paper-form" novalidate autocomplete="off">
+        <div class="paper-meta">
+          <div class="field">
+            <label class="field__label" for="tc-name">Full name</label>
+            <input class="input" id="tc-name" placeholder="e.g. Sana Malik">
+          </div>
+          <div class="field">
+            <label class="field__label" for="tc-email">Email</label>
+            <input class="input" id="tc-email" type="email" placeholder="teacher@example.com">
+          </div>
+          <div class="field">
+            <label class="field__label" for="tc-pin">Initial PIN</label>
+            <input class="input" id="tc-pin" inputmode="numeric" placeholder="4–8 digits">
+            <span class="field__hint">You share this with the teacher; they use it to sign in.</span>
+          </div>
+        </div>
+        <div class="field">
+          <label class="field__label" for="tc-subjects">Subjects <span class="muted">(comma-separated)</span></label>
+          <input class="input" id="tc-subjects" list="ba-subjects" placeholder="e.g. Mathematics, Physics">
+          <span class="field__hint">Must match the subject names on the papers (e.g. Science, Mathematics).</span>
+        </div>
+        <div class="paper-acts">
+          <button class="btn btn--primary" type="button" id="tc-create">Create teacher</button>
+        </div>
+      </form>
+
+      <div class="paper-existing">
+        <h2 class="panel__title">Existing teachers</h2>
+        <div id="tc-list"><p class="muted">Loading…</p></div>
       </div>
     </section>
 
@@ -1888,9 +1933,101 @@ select.input { appearance: auto; background: var(--surface); }
     });
   }
 
+  // ===================================================================
+  // TEACHERS — admin creates teacher accounts and assigns subjects.
+  // The teacher's own grading happens on the separate teacher.html panel.
+  // ===================================================================
+  function loadTeachers() {
+    var host = qs('#tc-list');
+    host.innerHTML = '<p class="muted">Loading…</p>';
+    authed('admin/listTeachers', {})
+      .then(function (data) { renderTeachers((data && data.teachers) || []); })
+      .catch(function (e) { host.innerHTML = ''; fail(e, 'Could not load teachers.'); });
+  }
+
+  function renderTeachers(list) {
+    var host = qs('#tc-list');
+    if (!list.length) { host.innerHTML = '<div class="empty"><h2>No teachers yet</h2><p>Create one above.</p></div>'; return; }
+    host.innerHTML = list.map(function (t) {
+      var st = String(t.status || '').toLowerCase();
+      var pill = '<span class="gr-pill gr-pill--' + (st === 'active' ? 'graded' : 'recheckrequested') + '">' + esc(t.status) + '</span>';
+      var subs = (t.subjects && t.subjects.length) ? t.subjects.join(', ') : '—';
+      var isActive = (t.status === 'Active');
+      var toggle = '<button class="btn btn--quiet btn--sm" data-act="tc-status" data-email="' + esc(t.email) + '" data-status="' + (isActive ? 'Suspended' : 'Active') + '">' + (isActive ? 'Suspend' : 'Activate') + '</button>';
+      return '<div class="pp-row">' +
+        '<div class="pp-row__main"><div class="pp-row__title">' + esc(t.fullName || 'Teacher') +
+          ' <span class="cell-sub">' + esc(t.email) + '</span></div>' +
+          '<div class="cell-sub">Subjects: ' + esc(subs) + '</div></div>' +
+        '<div class="pp-row__side">' + pill +
+          '<button class="btn btn--secondary btn--sm" data-act="tc-subjects" data-email="' + esc(t.email) + '" data-subjects="' + esc(subs === '—' ? '' : subs) + '">Edit subjects</button>' +
+          toggle +
+          '<button class="btn btn--quiet btn--sm" data-act="tc-resetpin" data-email="' + esc(t.email) + '">Reset PIN</button>' +
+        '</div></div>';
+    }).join('');
+  }
+
+  function createTeacher(button) {
+    var payload = {
+      fullName: qs('#tc-name').value.trim(),
+      email: qs('#tc-email').value.trim(),
+      pin: qs('#tc-pin').value.trim(),
+      subjects: qs('#tc-subjects').value.trim()
+    };
+    if (!payload.fullName || !payload.email || !payload.pin || !payload.subjects) {
+      toast('Fill in name, email, PIN and at least one subject.', 'bad');
+      return;
+    }
+    busy(button, true);
+    authed('admin/createTeacher', { teacher: payload })
+      .then(function () {
+        toast('Teacher created.', 'ok');
+        ['#tc-name', '#tc-email', '#tc-pin', '#tc-subjects'].forEach(function (s) { qs(s).value = ''; });
+        loadTeachers();
+      })
+      .catch(function (e) { fail(e, 'Could not create the teacher.'); })
+      .then(function () { busy(button, false); });
+  }
+
+  function onTeachersClick(e) {
+    var t = e.target.closest ? e.target.closest('[data-act]') : null;
+    if (!t) return;
+    var act = t.dataset.act;
+    var email = t.getAttribute('data-email');
+    if (act === 'gr-refresh-teachers') return loadTeachers();
+    if (act === 'tc-subjects') {
+      var next = window.prompt('Subjects for ' + email + ' (comma-separated):', t.getAttribute('data-subjects') || '');
+      if (next == null) return;
+      return authed('admin/setTeacherSubjects', { email: email, subjects: next })
+        .then(function () { toast('Subjects updated.', 'ok'); loadTeachers(); })
+        .catch(function (err) { fail(err, 'Could not update subjects.'); });
+    }
+    if (act === 'tc-status') {
+      var status = t.getAttribute('data-status');
+      return authed('admin/setTeacherStatus', { email: email, status: status })
+        .then(function () { toast('Teacher ' + status.toLowerCase() + '.', 'ok'); loadTeachers(); })
+        .catch(function (err) { fail(err, 'Could not change status.'); });
+    }
+    if (act === 'tc-resetpin') {
+      var pin = window.prompt('New PIN for ' + email + ' (4–8 digits):', '');
+      if (pin == null) return;
+      return authed('admin/resetTeacherPin', { email: email, newPin: pin.trim() })
+        .then(function () { toast('PIN reset. Share the new PIN with the teacher.', 'ok'); })
+        .catch(function (err) { fail(err, 'Could not reset the PIN.'); });
+    }
+  }
+
+  function wireTeachers() {
+    var panel = qs('[data-panel="teachers"]');
+    if (!panel) return;
+    panel.addEventListener('click', onTeachersClick);
+    var create = qs('#tc-create');
+    if (create) create.addEventListener('click', function (e) { createTeacher(e.currentTarget); });
+  }
+
   // ------------------------------------------------------------------- init
   wirePapers();
   wireGrading();
+  wireTeachers();
   if (window.__whaTurnstileReady) AdminCaptcha.render(); // audit S1 (onload covers the other order)
   qs('#signin').addEventListener('submit', submitSignIn);
   qs('#search').addEventListener('submit', function (e) {
@@ -1924,6 +2061,7 @@ select.input { appearance: auto; background: var(--surface); }
     if (t.dataset.view) {
       showView(t.dataset.view);
       if (t.dataset.view === 'grading') loadGrading();
+      if (t.dataset.view === 'teachers') loadTeachers();
     }
   });
 
