@@ -551,6 +551,12 @@ select.input { appearance: auto; background: var(--surface); }
     padding:0.6rem 0.9rem; border:1px solid #c7d2fe; background:#eef2ff; color:#3730a3;
     border-radius:var(--r-md,10px); font-size:0.9rem; }
   .ba-edit-banner em { color:var(--muted,#667); font-style:normal; }
+  .math-palette { display:flex; flex-wrap:wrap; gap:0.3rem; align-items:center; margin:0 0 0.6rem;
+    padding:0.4rem 0.5rem; border:1px solid var(--line); border-radius:var(--r-md,10px); background:var(--surface); }
+  .math-palette__hint { font-size:0.75rem; color:var(--muted,#667); margin-right:0.25rem; }
+  .math-palette button { min-width:30px; height:28px; padding:0 0.4rem; border:1px solid var(--line);
+    border-radius:6px; background:var(--surface); color:var(--ink,#234); cursor:pointer; font-size:0.9rem; line-height:1; }
+  .math-palette button:hover { background:var(--surface-2,#eef); border-color:var(--brand,#6366f1); }
 </style>
 </head>
 
@@ -755,6 +761,32 @@ select.input { appearance: auto; background: var(--surface); }
         <div class="paper-qhead">
           <h2 class="panel__title" style="margin:0;">Questions</h2>
           <span class="count" id="ba-total" style="margin:0;">0 questions · 0 marks</span>
+        </div>
+
+        <div id="ba-math-palette" class="math-palette" aria-label="Math insert toolbar">
+          <span class="math-palette__hint">Math insert (click in a box first):</span>
+          <button type="button" data-tex="\frac{$1}{}" title="Fraction a/b">a&frasl;b</button>
+          <button type="button" data-tex="^{$1}" title="Power / exponent">x&#8319;</button>
+          <button type="button" data-tex="_{$1}" title="Subscript">x&#8336;</button>
+          <button type="button" data-tex="\sqrt{$1}" title="Square root">&radic;</button>
+          <button type="button" data-tex="\sqrt[$1]{}" title="nth root">&#8319;&radic;</button>
+          <button type="button" data-tex="\left($1\right)" title="Auto-size ( )">(&nbsp;)</button>
+          <button type="button" data-tex="\left|$1\right|" title="Absolute value">|x|</button>
+          <button type="button" data-tex="\int_{$1}^{}\," title="Integral">&int;</button>
+          <button type="button" data-tex="\sum_{$1}^{}" title="Summation">&sum;</button>
+          <button type="button" data-tex="\lim_{$1 \to }" title="Limit">lim</button>
+          <button type="button" data-tex="\begin{pmatrix} $1 & \\ & \end{pmatrix}" title="2×2 matrix">[&#9636;]</button>
+          <button type="button" data-tex="\le " title="Less than or equal">&le;</button>
+          <button type="button" data-tex="\ge " title="Greater than or equal">&ge;</button>
+          <button type="button" data-tex="\ne " title="Not equal">&ne;</button>
+          <button type="button" data-tex="\pm " title="Plus-minus">&plusmn;</button>
+          <button type="button" data-tex="\times " title="Times">&times;</button>
+          <button type="button" data-tex="\div " title="Divide">&divide;</button>
+          <button type="button" data-tex="\cdot " title="Dot">&middot;</button>
+          <button type="button" data-tex="\pi " title="pi">&pi;</button>
+          <button type="button" data-tex="\theta " title="theta">&theta;</button>
+          <button type="button" data-tex="\infty " title="infinity">&infin;</button>
+          <button type="button" data-tex="\Rightarrow " title="implies">&rArr;</button>
         </div>
 
         <div id="ba-questions"></div>
@@ -1968,6 +2000,54 @@ select.input { appearance: auto; background: var(--surface); }
     qs('#ba-save-activate').textContent = 'Save & activate';
   }
 
+  // Tracks the last-focused math input and lets the toolbar buttons insert
+  // LaTeX at the cursor — so teachers get a Word-like "insert equation" feel
+  // without memorising LaTeX. Works on question text, MCQ options and steps.
+  var lastMathField = null;
+  function isMathField(el) {
+    if (!el) return false;
+    if (el.classList && el.classList.contains('q-text')) return true;             // question stem
+    var f = el.getAttribute && el.getAttribute('data-field');
+    return f === 'opt' || f === 'step-text';                                       // options / steps
+  }
+  function insertTex(field, tex) {
+    if (!field) return;
+    var start = field.selectionStart == null ? field.value.length : field.selectionStart;
+    var end = field.selectionEnd == null ? start : field.selectionEnd;
+    var val = field.value;
+    var sel = val.substring(start, end);
+    var mark = tex.indexOf('$1');
+    var snippet, caret;
+    if (mark >= 0) {
+      snippet = tex.slice(0, mark) + sel + tex.slice(mark + 2);   // drop $1, keep any selected text there
+      caret = start + mark + sel.length;                          // cursor lands right after the selection
+    } else {
+      snippet = tex;
+      caret = start + snippet.length;
+    }
+    field.value = val.substring(0, start) + snippet + val.substring(end);
+    field.focus();
+    try { field.setSelectionRange(caret, caret); } catch (e) {}
+    field.dispatchEvent(new Event('input', { bubbles: true }));   // update state + live preview
+  }
+  function wireMathPalette(qhost) {
+    var palette = qs('#ba-math-palette');
+    if (!palette) return;
+    // Remember the last math field the user was editing.
+    qhost.addEventListener('focusin', function (e) { if (isMathField(e.target)) lastMathField = e.target; });
+    // mousedown (not click) so the button press doesn't steal focus from the field.
+    palette.addEventListener('mousedown', function (e) {
+      var b = e.target.closest('button[data-tex]');
+      if (!b) return;
+      e.preventDefault();
+      if (!lastMathField || !document.contains(lastMathField)) {
+        toast('Click inside a question, option or step box first.', 'bad');
+        return;
+      }
+      insertTex(lastMathField, b.getAttribute('data-tex'));
+    });
+  }
+
   function wirePapers() {
     var form = qs('#ba-form');
     if (!form) return;
@@ -1988,6 +2068,7 @@ select.input { appearance: auto; background: var(--surface); }
     qhost.addEventListener('input', onQuestionsInput);
     qhost.addEventListener('change', onQuestionsInput);
     qhost.addEventListener('click', onQuestionsClick);
+    wireMathPalette(qhost);
     qs('#ba-papers-list').addEventListener('click', onPapersClick);
     qs('#ba-edit-banner').addEventListener('click', function (e) {
       if (e.target.closest('[data-act="ba-cancel-edit"]')) resetBuilder();
