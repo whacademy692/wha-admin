@@ -5,9 +5,7 @@
 <meta http-equiv="Content-Security-Policy" content="default-src 'self'; base-uri 'self'; object-src 'none'; frame-ancestors 'none'; script-src 'self' 'unsafe-inline'; style-src 'self' 'unsafe-inline' https://fonts.googleapis.com; img-src 'self' data:; font-src 'self' https://fonts.gstatic.com; connect-src 'self' https://script.google.com https://script.googleusercontent.com">
 <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
 <title>Teacher — W.H. Academy</title>
-<link rel="stylesheet" href="assets/vendor/katex/katex.min.css">
-<script src="assets/vendor/katex/katex.min.js"></script>
-<script src="assets/js/katex-render.js"></script>
+<link rel="stylesheet" href="assets/vendor/katex/katex.min.css"><script src="assets/vendor/katex/katex.min.js"></script><script src="assets/js/katex-render.js"></script>
 <style>
 
 /* ---------------------------------------------------------------------------
@@ -500,22 +498,18 @@ select.input { appearance: auto; background: var(--surface); }
   .math-palette button:hover { background:var(--surface-2,#eef); border-color:var(--brand,#6366f1); }
 
 
-  /* teacher panel additions */
-  .t-gate { max-width:420px; margin:8vh auto; padding:2rem; }
-  .t-gate .field { margin-bottom:1rem; }
-  .t-topbar { display:flex; align-items:center; justify-content:space-between; gap:1rem; flex-wrap:wrap; margin-bottom:1rem; }
-  .t-topbar__who { font-size:0.9rem; color:var(--muted,#667); }
-  .t-tabs { display:flex; gap:0.5rem; margin-bottom:1rem; }
-  .t-tab { padding:0.5rem 1rem; border:1px solid var(--line); border-radius:999px; background:var(--surface); cursor:pointer; font-weight:600; }
-  .t-tab[aria-current="true"] { background:var(--brand,#6366f1); color:#fff; border-color:var(--brand,#6366f1); }
-  .t-subjects-chip { display:inline-block; padding:0.1rem 0.5rem; border-radius:999px; background:var(--surface-2,#eef); font-size:0.75rem; margin-left:0.25rem; }
+  .t-gate{max-width:420px;margin:8vh auto;padding:2rem}.t-gate .field{margin-bottom:1rem}
+  .t-topbar{display:flex;align-items:center;justify-content:space-between;gap:1rem;flex-wrap:wrap;margin-bottom:1rem}
+  .t-tabs{display:flex;gap:.5rem;margin-bottom:1rem}
+  .t-tab{padding:.5rem 1rem;border:1px solid var(--line);border-radius:999px;background:var(--surface);cursor:pointer;font-weight:600}
+  .t-tab[aria-current="true"]{background:var(--brand,#6366f1);color:#fff;border-color:var(--brand,#6366f1)}
+  .t-subjects-chip{display:inline-block;padding:.1rem .5rem;border-radius:999px;background:var(--surface-2,#eef);font-size:.75rem;margin-left:.25rem}
 
 </style>
 </head>
 <body>
 
   <div id="toasts" class="toasts" aria-live="polite"></div>
-
   <div id="t-gate" class="t-gate panel" hidden>
     <h1 class="head__title" style="margin-top:0;">Teacher sign in</h1>
     <p class="head__sub">Use the email and PIN your administrator gave you.</p>
@@ -528,16 +522,12 @@ select.input { appearance: auto; background: var(--surface); }
 
 
   <div id="t-app" class="wrap" hidden>
-    <div class="t-topbar">
-      <div><strong>Teacher panel</strong> — <span id="t-name"></span> <span id="t-subjects"></span></div>
-      <button class="btn btn--quiet btn--sm" id="t-signout" type="button">Sign out</button>
-    </div>
-    <div class="t-tabs">
-      <button class="t-tab" data-tab="papers" type="button">Boss Papers</button>
-      <button class="t-tab" data-tab="grading" type="button">Grading</button>
-    </div>
+    <div class="t-topbar"><div><strong>Teacher panel</strong> — <span id="t-name"></span> <span id="t-subjects"></span></div>
+      <button class="btn btn--quiet btn--sm" id="t-signout" type="button">Sign out</button></div>
+    <div class="t-tabs"><button class="t-tab" data-tab="papers" type="button">Boss Papers</button>
+      <button class="t-tab" data-tab="grading" type="button">Grading</button></div>
 
-    <section data-panel="papers" hidden>
+<section data-panel="papers" hidden>
       <header class="head">
         <div>
           <h1 class="head__title">Boss Papers</h1>
@@ -590,6 +580,8 @@ select.input { appearance: auto; background: var(--surface); }
         <div class="field">
           <label class="field__label" for="ba-desc">Description</label>
           <input class="input" id="ba-desc" placeholder="Shown under the paper title to students (optional)">
+          <label class="field__label" for="ba-instructions" style="margin-top:0.5rem;">Instructions (optional)</label>
+          <textarea class="input" id="ba-instructions" rows="2" placeholder="Extra rules for THIS paper, shown to students under the standard instructions. Math in $…$."></textarea>
         </div>
 
         <div class="paper-qhead">
@@ -643,7 +635,7 @@ select.input { appearance: auto; background: var(--surface); }
         <div id="ba-papers-list"></div>
       </div>
     </section>
-    <section data-panel="grading" hidden>
+<section data-panel="grading" hidden>
       <!-- Stage 1: pick a paper to grade -->
       <div id="gr-stage-papers">
         <header class="head">
@@ -704,80 +696,48 @@ select.input { appearance: auto; background: var(--surface); }
 (function(){
 'use strict';
 
-  // Builder + grading state (reused functions rely on these top-level vars).
-  var DEFAULT_MARKS = { mcq: 1, short: 4, long: 10, steps: 8 };
-  var DEFAULT_LINES = { short: 4, long: 10 };
-  var qbuild = [];
-  var editingPaperId = null;
-  var qseq = 0;
-  var lastMathField = null;
-  var grState = { paperId: null, paperTitle: '', submissionId: null, total: 0 };
+
+  var DEFAULT_MARKS = { mcq:1, short:4, long:10, steps:8 };
+  var DEFAULT_LINES = { short:4, long:10 };
+  var qbuild = []; var editingPaperId = null; var qseq = 0; var lastMathField = null;
+  var grState = { paperId:null, paperTitle:'', submissionId:null, total:0 };
 
 
-  // ---- Teacher auth (email + admin-set PIN) ----
-  var API_BASE_URL = 'https://script.google.com/macros/s/AKfycbxjaqW5hmUk6B5gYW3hRjAfsPrbrdZB4a3B3VfJRvfKcfepz4WPYIX_aCVKS-STmiwQIA/exec';
-  var API_KEY = 'Jdb-iJByoQ-WA0UwlQrorQOH77buDQjepPH0y2SsDyo';
-  var TKEY = 'wha:teacher_token';
-  var teacherToken = null;
-  function getToken() { return teacherToken; }
-  function setToken(v) { teacherToken = v || null; try { v ? sessionStorage.setItem(TKEY, v) : sessionStorage.removeItem(TKEY); } catch (e) {} }
-  function loadToken() { try { return sessionStorage.getItem(TKEY) || null; } catch (e) { return null; } }
-  function endSession(msg) { setToken(null); showGate(); if (msg) toast(msg, 'bad'); }
-  function fail(err, fallback) { if (isAuthError(err)) { endSession('Your session ended — please sign in again.'); return; } toast((err && err.message) || fallback, 'bad'); }
-  function showGate() { qs('#t-gate').hidden = false; qs('#t-app').hidden = true; }
-  function showApp() { qs('#t-gate').hidden = true; qs('#t-app').hidden = false; }
-
-  var wired = false;
-  function afterLogin(res) {
-    qs('#t-name').textContent = res.fullName || 'Teacher';
-    var subs = res.subjects || [];
-    qs('#t-subjects').innerHTML = subs.map(function (s) { return '<span class="t-subjects-chip">' + esc(s) + '</span>'; }).join('');
-    // Populate the paper builder's subject <select> with ONLY this teacher's subjects.
-    var sel = qs('#ba-subject');
-    if (sel) { sel.innerHTML = '<option value="">— choose —</option>' + subs.map(function (s) { return '<option>' + esc(s) + '</option>'; }).join(''); }
-    showApp();
-    if (!wired) { wired = true; wirePapers(); wireGrading(); }
-    loadPapers();
-    loadGrading();
+  var API_BASE_URL='https://script.google.com/macros/s/AKfycbxjaqW5hmUk6B5gYW3hRjAfsPrbrdZB4a3B3VfJRvfKcfepz4WPYIX_aCVKS-STmiwQIA/exec'; var API_KEY='Jdb-iJByoQ-WA0UwlQrorQOH77buDQjepPH0y2SsDyo'; var TKEY='wha:teacher_token'; var teacherToken=null;
+  function getToken(){return teacherToken;}
+  function setToken(v){teacherToken=v||null;try{v?sessionStorage.setItem(TKEY,v):sessionStorage.removeItem(TKEY);}catch(e){}}
+  function loadToken(){try{return sessionStorage.getItem(TKEY)||null;}catch(e){return null;}}
+  function endSession(msg){setToken(null);showGate();if(msg)toast(msg,'bad');}
+  function fail(err,fallback){if(isAuthError(err)){endSession('Your session ended — please sign in again.');return;}toast((err&&err.message)||fallback,'bad');}
+  function showGate(){qs('#t-gate').hidden=false;qs('#t-app').hidden=true;}
+  function showApp(){qs('#t-gate').hidden=true;qs('#t-app').hidden=false;}
+  var wired=false;
+  function afterLogin(res){
+    qs('#t-name').textContent=res.fullName||'Teacher';
+    var subs=res.subjects||[];
+    qs('#t-subjects').innerHTML=subs.map(function(s){return '<span class="t-subjects-chip">'+esc(s)+'</span>';}).join('');
+    var sel=qs('#ba-subject'); if(sel){sel.innerHTML='<option value="">— choose —</option>'+subs.map(function(s){return '<option>'+esc(s)+'</option>';}).join('');}
+    showApp(); if(!wired){wired=true;wirePapers();wireGrading();} loadPapers(); loadGrading();
   }
-
-  function signIn(btn) {
-    var email = qs('#t-email').value.trim();
-    var pin = qs('#t-pin').value.trim();
-    if (!email || !pin) { toast('Enter your email and PIN.', 'bad'); return; }
-    busy(btn, true);
-    call('teacher/login', { email: email, pin: pin })
-      .then(function (res) { setToken(res.token); afterLogin(res); })
-      .catch(function (e) { toast((e && e.message) || 'Sign-in failed.', 'bad'); })
-      .then(function () { busy(btn, false); });
-  }
-
-  function switchTab(name) {
-    ['papers', 'grading'].forEach(function (n) {
-      var sec = qs('[data-panel="' + n + '"]'); if (sec) sec.hidden = (n !== name);
-      var tab = qs('.t-tab[data-tab="' + n + '"]'); if (tab) tab.setAttribute('aria-current', n === name ? 'true' : 'false');
-    });
-  }
-
-  function boot() {
-    qs('#t-signin').addEventListener('click', function (e) { signIn(e.currentTarget); });
-    qs('#t-pin').addEventListener('keydown', function (e) { if (e.key === 'Enter') signIn(qs('#t-signin')); });
-    qs('#t-signout').addEventListener('click', function () { endSession(); });
-    document.querySelectorAll('.t-tab').forEach(function (b) { b.addEventListener('click', function () { switchTab(b.getAttribute('data-tab')); }); });
+  function signIn(btn){var email=qs('#t-email').value.trim();var pin=qs('#t-pin').value.trim();
+    if(!email||!pin){toast('Enter your email and PIN.','bad');return;} busy(btn,true);
+    call('teacher/login',{email:email,pin:pin}).then(function(res){setToken(res.token);afterLogin(res);})
+    .catch(function(e){toast((e&&e.message)||'Sign-in failed.','bad');}).then(function(){busy(btn,false);});}
+  function switchTab(name){['papers','grading'].forEach(function(n){var sec=qs('[data-panel="'+n+'"]');if(sec)sec.hidden=(n!==name);var tab=qs('.t-tab[data-tab="'+n+'"]');if(tab)tab.setAttribute('aria-current',n===name?'true':'false');});}
+  function boot(){
+    qs('#t-signin').addEventListener('click',function(e){signIn(e.currentTarget);});
+    qs('#t-pin').addEventListener('keydown',function(e){if(e.key==='Enter')signIn(qs('#t-signin'));});
+    qs('#t-signout').addEventListener('click',function(){endSession();});
+    document.querySelectorAll('.t-tab').forEach(function(b){b.addEventListener('click',function(){switchTab(b.getAttribute('data-tab'));});});
     switchTab('papers');
-    // Session restore: a token in sessionStorage survives refresh within the tab.
-    var tok = loadToken();
-    if (tok) {
-      teacherToken = tok;
-      authed('teacher/mySubjects', {})
-        .then(function (res) { afterLogin(res); })
-        .catch(function () { endSession(); });
-    } else { showGate(); }
+    var tok=loadToken();
+    if(tok){teacherToken=tok;authed('teacher/mySubjects',{}).then(function(res){afterLogin(res);}).catch(function(){endSession();});}
+    else{showGate();}
   }
-  if (document.readyState === 'loading') document.addEventListener('DOMContentLoaded', boot); else boot();
+  if(document.readyState==='loading')document.addEventListener('DOMContentLoaded',boot);else boot();
 
 
-/* ===== reused, proven builder + grading (routes repointed to teacher/*) ===== */
+/* reused builder+grading (routes -> teacher/*) */
 
   function newQ(type) {
     qseq += 1;
@@ -994,6 +954,7 @@ select.input { appearance: auto; background: var(--surface); }
       chapterRef: qs('#ba-chapter').value.trim(),
       title: qs('#ba-title').value.trim(),
       description: qs('#ba-desc').value.trim(),
+      instructions: (qs('#ba-instructions') ? qs('#ba-instructions').value.trim() : ''),
       questions: qbuild.map(function (q) {
         var out = { type: q.type, text: String(q.text).trim(), marks: Number(q.marks) || 0 };
         if (q.type === 'mcq') {
@@ -1130,6 +1091,7 @@ select.input { appearance: auto; background: var(--surface); }
         qs('#ba-chapter').value = p.chapterRef || '';
         qs('#ba-title').value = p.title || '';
         qs('#ba-desc').value = p.description || '';
+        if (qs('#ba-instructions')) qs('#ba-instructions').value = p.instructions || '';
         qseq = 0;
         qbuild = (p.questions || []).map(paperQToBuilder);
         renderQuestions();
@@ -1217,7 +1179,7 @@ select.input { appearance: auto; background: var(--surface); }
 
   function resetBuilder() {
     qbuild = [];
-    ['#ba-title', '#ba-subject', '#ba-chapter', '#ba-desc'].forEach(function (s) { qs(s).value = ''; });
+    ['#ba-title', '#ba-subject', '#ba-chapter', '#ba-desc', '#ba-instructions'].forEach(function (s) { qs(s).value = ''; });
     exitEditMode();
     renderQuestions();
   }
