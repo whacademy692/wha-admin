@@ -756,6 +756,8 @@ select.input { appearance: auto; background: var(--surface); }
         <div class="field">
           <label class="field__label" for="ba-desc">Description</label>
           <input class="input" id="ba-desc" placeholder="Shown under the paper title to students (optional)">
+          <label class="field__label" for="ba-instructions" style="margin-top:0.5rem;">Instructions (optional)</label>
+          <textarea class="input" id="ba-instructions" rows="2" placeholder="Extra rules for THIS paper, shown to students under the standard instructions. Math in $…$."></textarea>
         </div>
 
         <div class="paper-qhead">
@@ -1822,6 +1824,7 @@ select.input { appearance: auto; background: var(--surface); }
       chapterRef: qs('#ba-chapter').value.trim(),
       title: qs('#ba-title').value.trim(),
       description: qs('#ba-desc').value.trim(),
+      instructions: (qs('#ba-instructions') ? qs('#ba-instructions').value.trim() : ''),
       questions: qbuild.map(function (q) {
         var out = { type: q.type, text: String(q.text).trim(), marks: Number(q.marks) || 0 };
         if (q.type === 'mcq') {
@@ -1855,7 +1858,7 @@ select.input { appearance: auto; background: var(--surface); }
 
   function resetBuilder() {
     qbuild = [];
-    ['#ba-title', '#ba-subject', '#ba-chapter', '#ba-desc'].forEach(function (s) { qs(s).value = ''; });
+    ['#ba-title', '#ba-subject', '#ba-chapter', '#ba-desc', '#ba-instructions'].forEach(function (s) { qs(s).value = ''; });
     exitEditMode();
     renderQuestions();
   }
@@ -1977,6 +1980,7 @@ select.input { appearance: auto; background: var(--surface); }
         qs('#ba-chapter').value = p.chapterRef || '';
         qs('#ba-title').value = p.title || '';
         qs('#ba-desc').value = p.description || '';
+        if (qs('#ba-instructions')) qs('#ba-instructions').value = p.instructions || '';
         qseq = 0;
         qbuild = (p.questions || []).map(paperQToBuilder);
         renderQuestions();
