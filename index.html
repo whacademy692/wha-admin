@@ -505,6 +505,8 @@ select.input { appearance: auto; background: var(--surface); }
 <link rel="stylesheet" href="assets/vendor/katex/katex.min.css">
 <script src="assets/vendor/katex/katex.min.js"></script>
 <script src="assets/js/katex-render.js"></script>
+<link rel="stylesheet" href="assets/vendor/mathlive/mathlive-static.css">
+<script src="assets/vendor/mathlive/mathlive.min.js"></script>
 <style>
   /* ---- Steps question builder + grading (uses the panel's own tokens) ---- */
   .steps-ed { display:flex; flex-direction:column; gap:0.75rem; margin-top:0.5rem; }
@@ -557,6 +559,18 @@ select.input { appearance: auto; background: var(--surface); }
   .math-palette button { min-width:30px; height:28px; padding:0 0.4rem; border:1px solid var(--line);
     border-radius:6px; background:var(--surface); color:var(--ink,#234); cursor:pointer; font-size:0.9rem; line-height:1; }
   .math-palette button:hover { background:var(--surface-2,#eef); border-color:var(--brand,#6366f1); }
+
+  /* MathLive equation-editor modal */
+  .mf-modal { position:fixed; inset:0; z-index:1000; display:flex; align-items:center; justify-content:center; }
+  .mf-modal[hidden] { display:none; }
+  .mf-modal__backdrop { position:absolute; inset:0; background:rgba(15,23,42,0.45); }
+  .mf-modal__box { position:relative; width:min(680px,92vw); background:var(--surface,#fff); border:1px solid var(--line,#e5e7eb); border-radius:var(--r-lg,14px); padding:1.25rem; box-shadow:0 20px 50px rgba(0,0,0,0.25); }
+  .mf-modal__title { font-weight:800; margin-bottom:0.75rem; }
+  .mf-field { width:100%; font-size:1.5rem; padding:0.5rem 0.75rem; border:1px solid var(--line,#e5e7eb); border-radius:var(--r-md,10px); background:#fff; }
+  .mf-modal__hint { font-size:0.8rem; color:var(--muted,#667); margin:0.6rem 0 1rem; }
+  .mf-modal__hint code { background:var(--surface-2,#eef); padding:0.05rem 0.3rem; border-radius:4px; }
+  .mf-modal__actions { display:flex; justify-content:flex-end; gap:0.5rem; }
+
 </style>
 </head>
 
@@ -767,6 +781,7 @@ select.input { appearance: auto; background: var(--surface); }
 
         <div id="ba-math-palette" class="math-palette" aria-label="Math insert toolbar">
           <span class="math-palette__hint">Math insert (click in a box first):</span>
+          <button type="button" data-mf="1" title="Visual equation editor (build it like in Word)" style="font-weight:700;">fx editor</button>
           <button type="button" data-tex="\frac{$1}{}" title="Fraction a/b">a&frasl;b</button>
           <button type="button" data-tex="^{$1}" title="Power / exponent">x&#8319;</button>
           <button type="button" data-tex="_{$1}" title="Subscript">x&#8336;</button>
@@ -1002,6 +1017,13 @@ select.input { appearance: auto; background: var(--surface); }
 <script>
 (function () {
   'use strict';
+  // MathLive (visual equation editor) — self-hosted; CSP-safe.
+  if (window.MathfieldElement) {
+    try {
+      window.MathfieldElement.fontsDirectory = 'assets/vendor/mathlive/fonts';
+      window.MathfieldElement.soundsDirectory = null; // no keypress sounds
+    } catch (e) {}
+  }
 
   // ==========================================================================
   // CONFIG — see the note at the top of this file. These two values also live
@@ -2046,18 +2068,62 @@ select.input { appearance: auto; background: var(--surface); }
     qhost.addEventListener('focusin', function (e) { if (isMathField(e.target)) lastMathField = e.target; });
     // mousedown (not click) so the button press doesn't steal focus from the field.
     palette.addEventListener('mousedown', function (e) {
-      var b = e.target.closest('button[data-tex]');
+      var b = e.target.closest('button[data-tex],button[data-mf]');
       if (!b) return;
       e.preventDefault();
       if (!lastMathField || !document.contains(lastMathField)) {
         toast('Click inside a question, option or step box first.', 'bad');
         return;
       }
+      if (b.hasAttribute('data-mf')) { openMathEditor(lastMathField); return; }
       insertTex(lastMathField, b.getAttribute('data-tex'));
     });
   }
 
+
+  // ---- Visual equation editor (MathLive) ----
+  var mfTarget = null, mfStart = 0, mfEnd = 0, mfWrap = false;
+  function stripDollars(t) { t = String(t || ''); return (t.length > 1 && t[0] === '$' && t[t.length - 1] === '$') ? t.slice(1, -1) : t; }
+  function openMathEditor(field) {
+    if (!window.MathfieldElement) { toast('Equation editor is still loading — try again in a moment.', 'bad'); return; }
+    var mf = qs('#mf-field'); var modal = qs('#mf-modal');
+    mfTarget = field;
+    var val = field.value;
+    var s = field.selectionStart, e = field.selectionEnd;
+    if (s == null || s === e) { s = 0; e = val.length; }        // no selection → whole field
+    mfStart = s; mfEnd = e;
+    // A stem (question text) mixes prose + math, so we wrap in $…$. Options/steps
+    // are pure math, so we insert raw LaTeX.
+    mfWrap = !!(field.classList && field.classList.contains('q-text'));
+    var seed = stripDollars(val.substring(s, e));
+    try { mf.value = seed; } catch (er) {}
+    modal.hidden = false;
+    setTimeout(function () { try { mf.focus(); } catch (er) {} }, 30);
+  }
+  function closeMathEditor() { qs('#mf-modal').hidden = true; mfTarget = null; }
+  function insertFromEditor() {
+    if (!mfTarget) { closeMathEditor(); return; }
+    var latex = '';
+    try { latex = qs('#mf-field').value || ''; } catch (e) {}
+    latex = latex.trim();
+    var out = mfWrap ? ('$' + latex + '$') : latex;
+    var v = mfTarget.value;
+    mfTarget.value = v.substring(0, mfStart) + out + v.substring(mfEnd);
+    var caret = mfStart + out.length;
+    try { mfTarget.focus(); mfTarget.setSelectionRange(caret, caret); } catch (e) {}
+    mfTarget.dispatchEvent(new Event('input', { bubbles: true }));
+    closeMathEditor();
+  }
+  function wireMathModal() {
+    var modal = qs('#mf-modal'); if (!modal || modal.__wired) return; modal.__wired = true;
+    qs('#mf-insert').addEventListener('click', insertFromEditor);
+    qs('#mf-cancel').addEventListener('click', closeMathEditor);
+    modal.querySelector('[data-mf-close]').addEventListener('click', closeMathEditor);
+    document.addEventListener('keydown', function (e) { if (!modal.hidden && e.key === 'Escape') closeMathEditor(); });
+  }
+
   function wirePapers() {
+    wireMathModal();
     var form = qs('#ba-form');
     if (!form) return;
     var csel = qs('#ba-class');
@@ -2485,5 +2551,18 @@ select.input { appearance: auto; background: var(--surface); }
 })();
 </script>
 
+
+  <div id="mf-modal" class="mf-modal" hidden>
+    <div class="mf-modal__backdrop" data-mf-close="1"></div>
+    <div class="mf-modal__box" role="dialog" aria-modal="true" aria-label="Equation editor">
+      <div class="mf-modal__title">Equation editor</div>
+      <math-field id="mf-field" class="mf-field"></math-field>
+      <p class="mf-modal__hint">Type like a calculator — e.g. <code>x^2</code>, <code>1/2</code> (auto-stacks), <code>sqrt</code>, <code>int</code>. It builds the equation visually; press Insert to place it in your box.</p>
+      <div class="mf-modal__actions">
+        <button class="btn btn--quiet" type="button" id="mf-cancel">Cancel</button>
+        <button class="btn btn--primary" type="button" id="mf-insert">Insert</button>
+      </div>
+    </div>
+  </div>
 </body>
 </html>
