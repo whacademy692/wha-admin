@@ -1606,6 +1606,7 @@ select.input { appearance: auto; background: var(--surface); }
       q.gradingMode = 'manual';
       q.perStep = '';
       q.penalty = '';
+      q.ordered = true;
     }
     else { q.maxLines = DEFAULT_LINES[type]; }
     return q;
@@ -1652,6 +1653,7 @@ select.input { appearance: auto; background: var(--surface); }
             '<option value="auto"' + (isAuto ? ' selected' : '') + '>Auto (suggest a score)</option>' +
           '</select>' +
         '</label>' +
+        '<label class="q-mini" style="margin-left:0;"><input type="checkbox" data-field="ordered" data-idx="' + i + '"' + ((q.ordered === false) ? '' : ' checked') + '> Order matters</label>' +
         '<div class="steps-knobs"' + (isAuto ? '' : ' hidden') + '>' +
           '<label class="q-mini" style="margin-left:0;">Marks / step ' +
             '<input class="input input--mini" type="number" min="0" step="0.5" data-field="perStep" data-idx="' + i + '" value="' + esc(q.perStep) + '" placeholder="auto"></label>' +
@@ -1748,6 +1750,7 @@ select.input { appearance: auto; background: var(--surface); }
       var knobs = t.closest('.steps-grading').querySelector('.steps-knobs');
       if (knobs) knobs.hidden = (q.gradingMode !== 'auto');
     }
+    else if (field === 'ordered') q.ordered = !!t.checked;
     else if (field === 'perStep') q.perStep = t.value;
     else if (field === 'penalty') q.penalty = t.value;
   }
@@ -1843,6 +1846,7 @@ select.input { appearance: auto; background: var(--surface); }
             .filter(function (s) { return String(s.text).trim() !== ''; })
             .map(function (s) { return { text: String(s.text).trim(), distractor: !!s.distractor }; });
           var grading = { mode: (q.gradingMode === 'auto') ? 'auto' : 'manual' };
+          if (q.ordered === false) grading.ordered = false;
           if (grading.mode === 'auto') {
             if (q.perStep !== '' && Number(q.perStep) > 0) grading.perStep = Number(q.perStep);
             if (q.penalty !== '' && Number(q.penalty) >= 0) grading.distractorPenalty = Number(q.penalty);
@@ -1962,6 +1966,7 @@ select.input { appearance: auto; background: var(--surface); }
       b.steps = (q.steps || []).map(function (s) { return { text: String(s.text || ''), distractor: !!s.distractor }; });
       if (!b.steps.length) b.steps = [{ text: '', distractor: false }];
       b.gradingMode = (q.grading && q.grading.mode === 'auto') ? 'auto' : 'manual';
+      b.ordered = !(q.grading && q.grading.ordered === false);
       b.perStep = (q.grading && q.grading.perStep != null) ? String(q.grading.perStep) : '';
       b.penalty = (q.grading && q.grading.distractorPenalty != null) ? String(q.grading.distractorPenalty) : '';
     } else {
