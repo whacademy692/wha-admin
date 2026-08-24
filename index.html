@@ -498,6 +498,32 @@ select.input { appearance: auto; background: var(--surface); }
   .q-mini { margin-left: 0; }
   .pp-row { flex-direction: column; align-items: flex-start; }
 }
+
+/* ---- Insights moderation ---- */
+.ins-controls { display: flex; gap: 8px; align-items: center; }
+.ins-filter { max-width: 150px; }
+.ins-card {
+  border: 1px solid var(--line, #e5e7eb);
+  border-radius: 12px;
+  padding: 14px 16px;
+  margin-bottom: 12px;
+  background: #fff;
+}
+.ins-card__head { display: flex; align-items: center; gap: 8px; flex-wrap: wrap; margin-bottom: 4px; }
+.ins-card__name { font-weight: 700; }
+.ins-card__meta { color: #6b7280; font-size: 0.82rem; margin-bottom: 8px; }
+.ins-role { font-size: 0.66rem; font-weight: 800; letter-spacing: 0.05em; text-transform: uppercase; color: #fff; padding: 2px 8px; border-radius: 999px; }
+.ins-role--student { background: #4f46e5; }
+.ins-role--parent { background: #f59e0b; }
+.ins-role--teacher { background: #ec4899; }
+.ins-status { font-size: 0.66rem; font-weight: 800; letter-spacing: 0.05em; text-transform: uppercase; padding: 2px 8px; border-radius: 999px; }
+.ins-status--pending { background: #fef3c7; color: #92400e; }
+.ins-status--approved { background: #d1fae5; color: #065f46; }
+.ins-status--rejected { background: #fee2e2; color: #991b1b; }
+.ins-block { margin-top: 8px; }
+.ins-block h4 { margin: 0 0 2px; font-size: 0.72rem; text-transform: uppercase; letter-spacing: 0.05em; color: #4f46e5; }
+.ins-block p { margin: 0; white-space: pre-wrap; }
+.ins-card__acts { display: flex; gap: 8px; margin-top: 12px; }
 </style>
 <!-- Boss-Battle "steps" question type: self-hosted KaTeX (CDN blocked by CSP)
      + the shared render helper. Loaded here so window.katex / window.MathText
@@ -671,6 +697,10 @@ select.input { appearance: auto; background: var(--surface); }
       <button class="side__item" data-view="devices" type="button">
         <svg viewBox="0 0 24 24" stroke-width="2" aria-hidden="true"><rect x="2" y="4" width="14" height="11" rx="2"/><rect x="17" y="9" width="5" height="11" rx="1.5"/><path stroke-linecap="round" d="M6 19h6"/></svg>
         Devices
+      </button>
+      <button class="side__item" data-view="insights" type="button">
+        <svg viewBox="0 0 24 24" stroke-width="2" aria-hidden="true"><path stroke-linecap="round" stroke-linejoin="round" d="M21 15a2 2 0 01-2 2H8l-4 4V5a2 2 0 012-2h13a2 2 0 012 2z"/><path stroke-linecap="round" d="M8 9h8M8 13h5"/></svg>
+        Insights
       </button>
     </nav>
 
@@ -947,6 +977,30 @@ select.input { appearance: auto; background: var(--surface); }
         </p>
         <button class="btn btn--danger" data-act="revoke-all" type="button">Sign out all devices</button>
       </div>
+    </section>
+
+    <section data-panel="insights" hidden>
+      <header class="head">
+        <div>
+          <h1 class="head__title">Insights</h1>
+          <p class="head__sub">
+            Public feedback from students, parents and teachers. <strong>Approve</strong> to show it on the
+            public Insights page — verbatim, in approval order. <strong>Reject</strong> to hide it. Nothing is
+            public until you approve it.
+          </p>
+        </div>
+        <div class="ins-controls">
+          <select id="ins-filter" class="input ins-filter" aria-label="Filter insights by status">
+            <option value="pending">Pending</option>
+            <option value="approved">Approved</option>
+            <option value="rejected">Rejected</option>
+            <option value="">All</option>
+          </select>
+          <button class="btn btn--quiet btn--sm" data-act="ins-refresh" type="button">Refresh</button>
+        </div>
+      </header>
+
+      <div id="ins-list"><p class="muted">Loading…</p></div>
     </section>
 
   </main>
@@ -2490,10 +2544,98 @@ select.input { appearance: auto; background: var(--surface); }
     if (create) create.addEventListener('click', function (e) { createTeacher(e.currentTarget); });
   }
 
+  // ==========================================================================
+  // INSIGHTS — moderate public feedback. Approve shows a row on the public
+  // Insights page verbatim; reject hides it. Approve/reject only flip status.
+  // ==========================================================================
+  function loadInsights() {
+    var filter = qs('#ins-filter');
+    var status = filter ? filter.value : 'pending';
+    var host = qs('#ins-list');
+    host.innerHTML = '<p class="muted">Loading…</p>';
+    authed('insights/adminList', { status: status })
+      .then(function (data) { renderInsights((data && data.insights) || []); })
+      .catch(function (e) { host.innerHTML = ''; fail(e, 'Could not load insights.'); });
+  }
+
+  function insBlock(title, text) {
+    if (!text) return '';
+    return '<div class="ins-block"><h4>' + esc(title) + '</h4><p>' + esc(text) + '</p></div>';
+  }
+
+  function insMeta(it) {
+    var bits = [];
+    if (it.role === 'teacher' && it.experienceYears) bits.push(esc(it.experienceYears) + ' yrs exp');
+    if (it.classLevel) bits.push('Class ' + esc(it.classLevel));
+    if (it.subject) bits.push(esc(it.subject));
+    if (it.chapter) bits.push(esc(it.chapter));
+    if (it.topic) bits.push('Topic: ' + esc(it.topic));
+    if (it.schools) bits.push(esc(it.schools));
+    return bits.join(' · ');
+  }
+
+  function renderInsights(list) {
+    var host = qs('#ins-list');
+    if (!list.length) { host.innerHTML = '<div class="empty"><h2>Nothing here</h2><p>No feedback for this filter yet.</p></div>'; return; }
+    host.innerHTML = list.map(function (it) {
+      var role = String(it.role || '');
+      var roleName = role.charAt(0).toUpperCase() + role.slice(1);
+      var status = String(it.status || 'pending');
+      var blocks;
+      if (role === 'student') {
+        blocks = insBlock('What was difficult', it.field1) + insBlock('How they solved it', it.field2);
+      } else if (role === 'parent') {
+        blocks = insBlock('Challenges', it.field1) + insBlock('Their approach', it.field2) + insBlock('Expectations', it.field3);
+      } else {
+        blocks = insBlock('Teaching tips', it.field1) + insBlock('Common mistakes', it.field2) + insBlock('Exam tips', it.field3);
+      }
+      var meta = insMeta(it);
+      var acts = '';
+      if (status !== 'approved') acts += '<button class="btn btn--primary btn--sm" data-act="ins-approve" data-id="' + esc(it.insightId) + '">Approve</button>';
+      if (status !== 'rejected') acts += '<button class="btn btn--quiet btn--sm" data-act="ins-reject" data-id="' + esc(it.insightId) + '">Reject</button>';
+      return '<div class="ins-card">' +
+        '<div class="ins-card__head">' +
+          '<span class="ins-card__name">' + esc(it.name || 'Anonymous') + '</span>' +
+          '<span class="ins-role ins-role--' + esc(role) + '">' + esc(roleName) + '</span>' +
+          '<span class="ins-status ins-status--' + esc(status) + '">' + esc(status) + '</span>' +
+        '</div>' +
+        (meta ? '<div class="ins-card__meta">' + meta + '</div>' : '') +
+        blocks +
+        '<div class="ins-card__acts">' + acts + '</div>' +
+      '</div>';
+    }).join('');
+  }
+
+  function moderateInsight(id, action, btn) {
+    if (!id) return;
+    busy(btn, true);
+    authed('insights/moderate', { insightId: id, action: action })
+      .then(function () { toast(action === 'approve' ? 'Approved — now public.' : 'Rejected — hidden.', 'ok'); loadInsights(); })
+      .catch(function (e) { fail(e, 'Could not update the insight.'); })
+      .then(function () { busy(btn, false); });
+  }
+
+  function onInsightsClick(e) {
+    var t = e.target.closest ? e.target.closest('[data-act]') : null;
+    if (!t) return;
+    if (t.dataset.act === 'ins-refresh') return loadInsights();
+    if (t.dataset.act === 'ins-approve') return moderateInsight(t.dataset.id, 'approve', t);
+    if (t.dataset.act === 'ins-reject') return moderateInsight(t.dataset.id, 'reject', t);
+  }
+
+  function wireInsights() {
+    var panel = qs('[data-panel="insights"]');
+    if (!panel) return;
+    panel.addEventListener('click', onInsightsClick);
+    var filter = qs('#ins-filter');
+    if (filter) filter.addEventListener('change', loadInsights);
+  }
+
   // ------------------------------------------------------------------- init
   wirePapers();
   wireGrading();
   wireTeachers();
+  wireInsights();
   if (window.__whaTurnstileReady) AdminCaptcha.render(); // audit S1 (onload covers the other order)
   qs('#signin').addEventListener('submit', submitSignIn);
   qs('#search').addEventListener('submit', function (e) {
@@ -2528,6 +2670,7 @@ select.input { appearance: auto; background: var(--surface); }
       showView(t.dataset.view);
       if (t.dataset.view === 'grading') loadGrading();
       if (t.dataset.view === 'teachers') loadTeachers();
+      if (t.dataset.view === 'insights') loadInsights();
     }
   });
 
