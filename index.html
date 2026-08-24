@@ -1220,6 +1220,16 @@ select.input { appearance: auto; background: var(--surface); }
    * cross-origin request, so the browser sends it without a CORS preflight.
    * Apps Script cannot answer a preflight, so application/json would fail.
    */
+  // Cold-start HTML is only safe to auto-retry for idempotent READS. Login,
+  // OTP and writes must never auto-retry: login is rate-limited and its
+  // Turnstile token is single-use, and re-sending a write could double-apply.
+  var RETRYABLE_OPS = {
+    'insights/adminList': 1, 'insights/approved': 1,
+    'admin/statistics': 1, 'admin/searchStudents': 1, 'admin/listTeachers': 1, 'admin/devices': 1,
+    'bossbattle/admin/listPapers': 1, 'bossbattle/admin/listSubmissions': 1,
+    'bossbattle/admin/getPaperForEdit': 1, 'bossbattle/admin/submissionForGrading': 1
+  };
+
   function call(operation, params, _attempt) {
     var attempt = _attempt || 1;
     var body = { operation: operation, apiKey: API_KEY };
@@ -1234,26 +1244,21 @@ select.input { appearance: auto; background: var(--surface); }
     .then(function (text) {
       var payload = null;
       try { payload = JSON.parse(text); } catch (e) { payload = null; }
-      // Apps Script sometimes returns an HTML page (not JSON) on a cold start,
-      // right after a new deployment, or a transient hiccup. Treat that as
-      // retryable rather than surfacing "Unexpected token '<'".
-      if (payload === null) { var re = new Error('cold-start'); re.__retry = true; throw re; }
+      // Apps Script returns an HTML page (not JSON) on a cold start, right
+      // after a deploy, or a transient hiccup — surface it cleanly instead of
+      // "Unexpected token '<'". Auto-retry ONLY for read operations.
+      if (payload === null) {
+        if (RETRYABLE_OPS[operation] && attempt < 4) {
+          return new Promise(function (resolve) {
+            setTimeout(function () { resolve(call(operation, params, attempt + 1)); }, 700 * attempt);
+          });
+        }
+        throw new Error('The server is waking up — please try again in a moment.');
+      }
       if (payload.success) return payload.data || {};
       var err = new Error((payload.error && payload.error.message) || 'Something went wrong.');
       err.code = payload.error && payload.error.code;
       throw err;
-    })
-    .catch(function (e) {
-      // Retry only transient failures — non-JSON (cold start) or a network
-      // TypeError. A real app error carries a .code and is surfaced at once.
-      var transient = (e && e.__retry) || (e instanceof TypeError);
-      if (transient && attempt < 4) {
-        return new Promise(function (resolve) {
-          setTimeout(function () { resolve(call(operation, params, attempt + 1)); }, 700 * attempt);
-        });
-      }
-      if (e && e.__retry) throw new Error('The server is waking up — please try again in a moment.');
-      throw e;
     });
   }
 
