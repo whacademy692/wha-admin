@@ -991,10 +991,10 @@ select.input { appearance: auto; background: var(--surface); }
         </div>
         <div class="ins-controls">
           <select id="ins-filter" class="input ins-filter" aria-label="Filter insights by status">
+            <option value="">All</option>
             <option value="pending">Pending</option>
             <option value="approved">Approved</option>
             <option value="rejected">Rejected</option>
-            <option value="">All</option>
           </select>
           <button class="btn btn--quiet btn--sm" data-act="ins-refresh" type="button">Refresh</button>
         </div>
@@ -2548,14 +2548,45 @@ select.input { appearance: auto; background: var(--surface); }
   // INSIGHTS — moderate public feedback. Approve shows a row on the public
   // Insights page verbatim; reject hides it. Approve/reject only flip status.
   // ==========================================================================
+  // Lazy-rendered so a long feedback list never blocks the panel: everything
+  // is fetched once, then drawn in batches as the admin scrolls (IntersectionObserver).
+  var insList = [];
+  var insShown = 0;
+  var insObserver = null;
+  var INS_BATCH = 12;
+
   function loadInsights() {
     var filter = qs('#ins-filter');
-    var status = filter ? filter.value : 'pending';
+    var status = filter ? filter.value : '';
     var host = qs('#ins-list');
     host.innerHTML = '<p class="muted">Loading…</p>';
+    if (insObserver) { insObserver.disconnect(); insObserver = null; }
     authed('insights/adminList', { status: status })
-      .then(function (data) { renderInsights((data && data.insights) || []); })
+      .then(function (data) {
+        insList = (data && data.insights) || [];
+        insShown = 0;
+        host.innerHTML = '';
+        if (!insList.length) { host.innerHTML = '<div class="empty"><h2>Nothing here</h2><p>No feedback for this filter yet.</p></div>'; return; }
+        renderMoreInsights();
+      })
       .catch(function (e) { host.innerHTML = ''; fail(e, 'Could not load insights.'); });
+  }
+
+  function renderMoreInsights() {
+    var host = qs('#ins-list');
+    var old = qs('#ins-sentinel'); if (old) old.remove();
+    var slice = insList.slice(insShown, insShown + INS_BATCH);
+    insShown += slice.length;
+    slice.forEach(function (it) { host.insertAdjacentHTML('beforeend', insCard(it)); });
+    if (insShown < insList.length) {
+      host.insertAdjacentHTML('beforeend', '<div id="ins-sentinel" style="height:1px;"></div>');
+      var sentinel = qs('#ins-sentinel');
+      if (insObserver) insObserver.disconnect();
+      insObserver = new IntersectionObserver(function (entries) {
+        if (entries[0].isIntersecting) { insObserver.disconnect(); renderMoreInsights(); }
+      }, { rootMargin: '300px' });
+      insObserver.observe(sentinel);
+    }
   }
 
   function insBlock(title, text) {
@@ -2569,50 +2600,57 @@ select.input { appearance: auto; background: var(--surface); }
     if (it.classLevel) bits.push('Class ' + esc(it.classLevel));
     if (it.subject) bits.push(esc(it.subject));
     if (it.chapter) bits.push(esc(it.chapter));
-    if (it.topic) bits.push('Topic: ' + esc(it.topic));
     if (it.schools) bits.push(esc(it.schools));
     return bits.join(' · ');
   }
 
-  function renderInsights(list) {
-    var host = qs('#ins-list');
-    if (!list.length) { host.innerHTML = '<div class="empty"><h2>Nothing here</h2><p>No feedback for this filter yet.</p></div>'; return; }
-    host.innerHTML = list.map(function (it) {
-      var role = String(it.role || '');
-      var roleName = role.charAt(0).toUpperCase() + role.slice(1);
-      var status = String(it.status || 'pending');
-      var blocks;
-      if (role === 'student') {
-        blocks = insBlock('What was difficult', it.field1) + insBlock('How they solved it', it.field2);
-      } else if (role === 'parent') {
-        blocks = insBlock('Challenges', it.field1) + insBlock('Their approach', it.field2) + insBlock('Expectations', it.field3);
-      } else {
-        blocks = insBlock('Teaching tips', it.field1) + insBlock('Common mistakes', it.field2) + insBlock('Exam tips', it.field3);
-      }
-      var meta = insMeta(it);
-      var acts = '';
-      if (status !== 'approved') acts += '<button class="btn btn--primary btn--sm" data-act="ins-approve" data-id="' + esc(it.insightId) + '">Approve</button>';
-      if (status !== 'rejected') acts += '<button class="btn btn--quiet btn--sm" data-act="ins-reject" data-id="' + esc(it.insightId) + '">Reject</button>';
-      return '<div class="ins-card">' +
-        '<div class="ins-card__head">' +
-          '<span class="ins-card__name">' + esc(it.name || 'Anonymous') + '</span>' +
-          '<span class="ins-role ins-role--' + esc(role) + '">' + esc(roleName) + '</span>' +
-          '<span class="ins-status ins-status--' + esc(status) + '">' + esc(status) + '</span>' +
-        '</div>' +
-        (meta ? '<div class="ins-card__meta">' + meta + '</div>' : '') +
-        blocks +
-        '<div class="ins-card__acts">' + acts + '</div>' +
-      '</div>';
-    }).join('');
+  function insCard(it) {
+    var role = String(it.role || '');
+    var roleName = role.charAt(0).toUpperCase() + role.slice(1);
+    var status = String(it.status || 'pending');
+    var blocks = insBlock('Topic', it.topic);
+    if (role === 'student') {
+      blocks += insBlock('What was difficult', it.field1) + insBlock('How they solved it', it.field2);
+    } else if (role === 'parent') {
+      blocks += insBlock('Challenges', it.field1) + insBlock('Their approach', it.field2) + insBlock('Expectations', it.field3);
+    } else {
+      blocks += insBlock('Teaching tips', it.field1) + insBlock('Common mistakes', it.field2) + insBlock('Exam tips', it.field3);
+    }
+    var meta = insMeta(it);
+    var id = esc(it.insightId);
+    // Contextual buttons: never offer the state it is already in.
+    var acts = '';
+    if (status === 'pending') {
+      acts = '<button class="btn btn--primary btn--sm" data-act="ins-approve" data-id="' + id + '">Approve</button>' +
+             '<button class="btn btn--quiet btn--sm" data-act="ins-reject" data-id="' + id + '">Reject</button>';
+    } else if (status === 'approved') {
+      acts = '<button class="btn btn--quiet btn--sm" data-act="ins-hold" data-id="' + id + '">Unpublish (hold)</button>' +
+             '<button class="btn btn--quiet btn--sm" data-act="ins-reject" data-id="' + id + '">Reject</button>';
+    } else { // rejected
+      acts = '<button class="btn btn--primary btn--sm" data-act="ins-approve" data-id="' + id + '">Approve</button>' +
+             '<button class="btn btn--quiet btn--sm" data-act="ins-hold" data-id="' + id + '">Move to pending</button>';
+    }
+    acts += '<button class="btn btn--danger btn--sm" data-act="ins-delete" data-id="' + id + '">Delete</button>';
+    return '<div class="ins-card">' +
+      '<div class="ins-card__head">' +
+        '<span class="ins-card__name">' + esc(it.name || 'Anonymous') + '</span>' +
+        '<span class="ins-role ins-role--' + esc(role) + '">' + esc(roleName) + '</span>' +
+        '<span class="ins-status ins-status--' + esc(status) + '">' + esc(status) + '</span>' +
+      '</div>' +
+      (meta ? '<div class="ins-card__meta">' + meta + '</div>' : '') +
+      blocks +
+      '<div class="ins-card__acts">' + acts + '</div>' +
+    '</div>';
   }
 
   function moderateInsight(id, action, btn) {
     if (!id) return;
+    if (action === 'delete' && !window.confirm('Delete this feedback permanently? This cannot be undone.')) return;
+    var msg = { approve: 'Approved — now public.', reject: 'Rejected — hidden.', hold: 'Moved back to pending.', 'delete': 'Deleted.' }[action] || 'Updated.';
     busy(btn, true);
     authed('insights/moderate', { insightId: id, action: action })
-      .then(function () { toast(action === 'approve' ? 'Approved — now public.' : 'Rejected — hidden.', 'ok'); loadInsights(); })
-      .catch(function (e) { fail(e, 'Could not update the insight.'); })
-      .then(function () { busy(btn, false); });
+      .then(function () { toast(msg, 'ok'); loadInsights(); })
+      .catch(function (e) { fail(e, 'Could not update the insight.'); busy(btn, false); });
   }
 
   function onInsightsClick(e) {
@@ -2621,6 +2659,8 @@ select.input { appearance: auto; background: var(--surface); }
     if (t.dataset.act === 'ins-refresh') return loadInsights();
     if (t.dataset.act === 'ins-approve') return moderateInsight(t.dataset.id, 'approve', t);
     if (t.dataset.act === 'ins-reject') return moderateInsight(t.dataset.id, 'reject', t);
+    if (t.dataset.act === 'ins-hold') return moderateInsight(t.dataset.id, 'hold', t);
+    if (t.dataset.act === 'ins-delete') return moderateInsight(t.dataset.id, 'delete', t);
   }
 
   function wireInsights() {
