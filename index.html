@@ -1104,6 +1104,7 @@ select.input { appearance: auto; background: var(--surface); }
         <div class="an-controls">
           <select id="an-class" class="input an-filter" aria-label="Filter by class"><option value="">All classes</option></select>
           <select id="an-subject" class="input an-filter" aria-label="Filter by subject"><option value="">All subjects</option></select>
+          <select id="an-chapter" class="input an-filter" aria-label="Filter by chapter"><option value="">All chapters</option></select>
           <button class="btn btn--quiet btn--sm" data-act="an-refresh" type="button">Refresh</button>
         </div>
       </header>
@@ -2858,61 +2859,69 @@ select.input { appearance: auto; background: var(--surface); }
 
   // ==========================================================================
   // ANALYTICS — which chapters/topics students find hardest (game performance).
-  // Backend returns chapters (hardest-first) each with a topic breakdown;
-  // chapterRef -> human title comes from this baked map (built from the games'
-  // content.json). Filtering is client-side.
+  // Fully dynamic: the Class / Subject / Chapter filters are built from whatever
+  // chapters actually have data. As new games get played, their class, subject
+  // and chapter appear here automatically — nothing to hardcode or maintain.
   // ==========================================================================
-  var CHAPTER_META = {
-    "class6/subjects/geography/structure_of_earth_and_rocks": [6, "Geography", "Structure of Earth and Types of Rocks"],
-    "class6/subjects/history/mesopotamia": [6, "History", "Mesopotamia"],
-    "class6/subjects/math/primes_hcf_lcm_and_integers": [6, "Mathematics", "Primes, HCF, LCM and Integers"],
-    "class6/subjects/science/cellular_organization": [6, "Science", "Cellular Organization"],
-    "class7/subjects/geography/plains_and_rivers": [7, "Geography", "Plains and Rivers"],
-    "class7/subjects/history/middle_ages": [7, "History", "The Middle Ages"],
-    "class7/subjects/math/real_numbers_and_approximation": [7, "Mathematics", "Real Numbers and Approximation"],
-    "class7/subjects/science/plant_systems": [7, "Science", "Plant Systems"],
-    "class8/subjects/geography/oceans_and_seas": [8, "Geography", "Oceans and Seas"],
-    "class8/subjects/history/colonization_of_subcontinent": [8, "History", "Colonization of the Subcontinent"],
-    "class8/subjects/math/further_expansion_and_factorization": [8, "Mathematics", "Further Expansion and Factorization of Algebraic Expression"],
-    "class8/subjects/science/human_nervous_system": [8, "Science", "The Human Nervous System"]
-  };
-
   var anData = [];
+
+  // Display-only prettifier for known subject keys; anything unknown just gets
+  // humanized, so a brand-new subject still shows up with a sensible label.
+  var SUBJECT_NAMES = {
+    math: 'Mathematics', science: 'General Science', geography: 'Geography', history: 'History',
+    bio: 'Biology', chem: 'Chemistry', cs: 'Computer Science', phys: 'Physics'
+  };
 
   function anHumanize(s) {
     return String(s || '').replace(/[_-]+/g, ' ').replace(/\b\w/g, function (c) { return c.toUpperCase(); }).trim();
   }
   function anChapterTitle(ref) {
-    var m = CHAPTER_META[ref];
-    if (m) return m[2];
     var parts = String(ref).split('/');
     return anHumanize(parts[parts.length - 1]);
   }
-  function anSubjectLabel(key) {
-    for (var r in CHAPTER_META) { if (r.split('/')[2] === key) return CHAPTER_META[r][1]; }
-    return anHumanize(key);
-  }
+  function anSubjectLabel(key) { return SUBJECT_NAMES[key] || anHumanize(key); }
   function anPct(acc) { return Math.round(acc * 100) + '%'; }
   function anFill(acc) { return acc < 0.5 ? 'an-fill--bad' : (acc < 0.75 ? 'an-fill--mid' : 'an-fill--ok'); }
+  function anDistinct(arr) { var seen = {}, out = []; arr.forEach(function (x) { if (x != null && x !== '' && !seen[x]) { seen[x] = 1; out.push(x); } }); return out; }
 
-  function fillAnalyticsFilters() {
-    var classes = {}, subjects = {};
-    for (var r in CHAPTER_META) { classes[CHAPTER_META[r][0]] = 1; subjects[r.split('/')[2]] = CHAPTER_META[r][1]; }
-    var cSel = qs('#an-class');
-    Object.keys(classes).sort(function (a, b) { return a - b; }).forEach(function (c) {
-      cSel.insertAdjacentHTML('beforeend', '<option value="' + esc(c) + '">Class ' + esc(c) + '</option>');
-    });
-    var sSel = qs('#an-subject');
-    Object.keys(subjects).sort().forEach(function (k) {
-      sSel.insertAdjacentHTML('beforeend', '<option value="' + esc(k) + '">' + esc(subjects[k]) + '</option>');
-    });
+  // ---- cascade filter dropdowns, all derived from anData ----
+  function anBuildClassOptions() {
+    var sel = qs('#an-class'); if (!sel) return; var cur = sel.value;
+    var classes = anDistinct(anData.map(function (c) { return c.classLevel; })).sort(function (a, b) { return a - b; });
+    sel.innerHTML = '<option value="">All classes</option>' +
+      classes.map(function (c) { return '<option value="' + esc(c) + '">Class ' + esc(c) + '</option>'; }).join('');
+    if (classes.map(String).indexOf(cur) >= 0) sel.value = cur;
+  }
+  function anBuildSubjectOptions() {
+    var sel = qs('#an-subject'); if (!sel) return; var cur = sel.value;
+    var fClass = qs('#an-class').value;
+    var subs = anDistinct(anData
+      .filter(function (c) { return !fClass || String(c.classLevel) === String(fClass); })
+      .map(function (c) { return c.subjectKey; })).sort();
+    sel.innerHTML = '<option value="">All subjects</option>' +
+      subs.map(function (k) { return '<option value="' + esc(k) + '">' + esc(anSubjectLabel(k)) + '</option>'; }).join('');
+    sel.value = (subs.indexOf(cur) >= 0) ? cur : '';
+  }
+  function anBuildChapterOptions() {
+    var sel = qs('#an-chapter'); if (!sel) return; var cur = sel.value;
+    var fClass = qs('#an-class').value, fSub = qs('#an-subject').value;
+    var refs = anDistinct(anData
+      .filter(function (c) { return (!fClass || String(c.classLevel) === String(fClass)) && (!fSub || c.subjectKey === fSub); })
+      .map(function (c) { return c.chapterRef; }));
+    sel.innerHTML = '<option value="">All chapters</option>' +
+      refs.map(function (r) { return '<option value="' + esc(r) + '">' + esc(anChapterTitle(r)) + '</option>'; }).join('');
+    sel.value = (refs.indexOf(cur) >= 0) ? cur : '';
   }
 
   function loadAnalytics() {
     var host = qs('#an-list');
     host.innerHTML = '<p class="muted">Loading…</p>';
     authed('analytics/contentDifficulty', {})
-      .then(function (d) { anData = (d && d.chapters) || []; renderAnalytics(); })
+      .then(function (d) {
+        anData = (d && d.chapters) || [];
+        anBuildClassOptions(); anBuildSubjectOptions(); anBuildChapterOptions();
+        renderAnalytics();
+      })
       .catch(function (e) { host.innerHTML = ''; fail(e, 'Could not load analytics.'); });
   }
 
@@ -2954,9 +2963,11 @@ select.input { appearance: auto; background: var(--surface); }
     var host = qs('#an-list');
     var fClass = qs('#an-class') ? qs('#an-class').value : '';
     var fSubject = qs('#an-subject') ? qs('#an-subject').value : '';
+    var fChapter = qs('#an-chapter') ? qs('#an-chapter').value : '';
     var list = anData.filter(function (c) {
       if (fClass && String(c.classLevel) !== String(fClass)) return false;
       if (fSubject && c.subjectKey !== fSubject) return false;
+      if (fChapter && c.chapterRef !== fChapter) return false;
       return true;
     });
     if (!list.length) {
@@ -2988,11 +2999,11 @@ select.input { appearance: auto; background: var(--surface); }
   function wireAnalytics() {
     var panel = qs('[data-panel="analytics"]');
     if (!panel) return;
-    fillAnalyticsFilters();
     panel.addEventListener('click', onAnalyticsClick);
-    var c = qs('#an-class'), s = qs('#an-subject');
-    if (c) c.addEventListener('change', renderAnalytics);
-    if (s) s.addEventListener('change', renderAnalytics);
+    var c = qs('#an-class'), s = qs('#an-subject'), ch = qs('#an-chapter');
+    if (c) c.addEventListener('change', function () { anBuildSubjectOptions(); anBuildChapterOptions(); renderAnalytics(); });
+    if (s) s.addEventListener('change', function () { anBuildChapterOptions(); renderAnalytics(); });
+    if (ch) ch.addEventListener('change', renderAnalytics);
   }
 
   // ------------------------------------------------------------------- init
