@@ -523,7 +523,50 @@ select.input { appearance: auto; background: var(--surface); }
 .ins-block { margin-top: 8px; }
 .ins-block h4 { margin: 0 0 2px; font-size: 0.72rem; text-transform: uppercase; letter-spacing: 0.05em; color: #4f46e5; }
 .ins-block p { margin: 0; white-space: pre-wrap; }
-.ins-card__acts { display: flex; gap: 8px; margin-top: 12px; }
+.ins-card__acts { display: flex; gap: 8px; margin-top: 12px; flex-wrap: wrap; }
+
+/* ---- Collapsed accordion rows ---- */
+.ins-row {
+  border: 1px solid var(--line, #e5e7eb);
+  border-radius: 12px;
+  margin-bottom: 10px;
+  background: #fff;
+  overflow: hidden;
+}
+.ins-row.is-open { box-shadow: 0 8px 24px rgba(30, 27, 75, 0.08); }
+.ins-row__head { display: flex; align-items: center; gap: 10px; padding: 10px 12px; flex-wrap: wrap; }
+.ins-row__main {
+  flex: 1 1 260px;
+  min-width: 0;
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  background: none;
+  border: none;
+  padding: 4px;
+  margin: 0;
+  cursor: pointer;
+  text-align: left;
+  font: inherit;
+  color: inherit;
+  border-radius: 8px;
+}
+.ins-row__main:hover { background: #f5f5fb; }
+.ins-row__chev { flex: none; color: #9ca3af; transition: transform 0.15s ease; font-size: 0.9rem; }
+.ins-row.is-open .ins-row__chev { transform: rotate(90deg); }
+.ins-row__text { min-width: 0; display: flex; flex-direction: column; gap: 2px; }
+.ins-row__title { display: flex; align-items: center; gap: 8px; flex-wrap: wrap; }
+.ins-row__sub {
+  color: #6b7280;
+  font-size: 0.82rem;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  max-width: 100%;
+}
+.ins-row__quick { display: flex; gap: 8px; flex: none; }
+.ins-row__body { padding: 4px 16px 16px; border-top: 1px solid var(--line, #eee); }
+.ins-row__body .ins-card__meta { margin-top: 12px; }
 </style>
 <!-- Boss-Battle "steps" question type: self-hosted KaTeX (CDN blocked by CSP)
      + the shared render helper. Loaded here so window.katex / window.MathText
@@ -2628,10 +2671,22 @@ select.input { appearance: auto; background: var(--surface); }
     return bits.join(' · ');
   }
 
+  function insPreview(it) {
+    var meta = insMeta(it);
+    if (meta) return meta;
+    var first = String(it.field1 || '').replace(/\s+/g, ' ').trim();
+    return first.length > 80 ? esc(first.slice(0, 80)) + '…' : esc(first);
+  }
+
+  // Collapsed by default: a one-line bar per feedback with quick Approve/Reject
+  // right on it. Clicking the bar (not the buttons) expands the full card to
+  // read everything and Delete. Keeps a long, busy list scannable.
   function insCard(it) {
     var role = String(it.role || '');
     var roleName = role.charAt(0).toUpperCase() + role.slice(1);
     var status = String(it.status || 'pending');
+    var id = esc(it.insightId);
+
     var blocks = insBlock('Topic', it.topic);
     if (role === 'student') {
       blocks += insBlock('What was difficult', it.field1) + insBlock('How they solved it', it.field2);
@@ -2641,30 +2696,67 @@ select.input { appearance: auto; background: var(--surface); }
       blocks += insBlock('Teaching tips', it.field1) + insBlock('Common mistakes', it.field2) + insBlock('Exam tips', it.field3);
     }
     var meta = insMeta(it);
-    var id = esc(it.insightId);
-    // Contextual buttons: never offer the state it is already in.
-    var acts = '';
+
+    // Quick actions live on the collapsed bar (no Delete here — that needs the
+    // full card open, to avoid an accidental delete from the list).
+    var quick;
     if (status === 'pending') {
-      acts = '<button class="btn btn--primary btn--sm" data-act="ins-approve" data-id="' + id + '">Approve</button>' +
+      quick = '<button class="btn btn--primary btn--sm" data-act="ins-approve" data-id="' + id + '">Approve</button>' +
+              '<button class="btn btn--quiet btn--sm" data-act="ins-reject" data-id="' + id + '">Reject</button>';
+    } else if (status === 'approved') {
+      quick = '<button class="btn btn--quiet btn--sm" data-act="ins-hold" data-id="' + id + '">Unpublish</button>' +
+              '<button class="btn btn--quiet btn--sm" data-act="ins-reject" data-id="' + id + '">Reject</button>';
+    } else {
+      quick = '<button class="btn btn--primary btn--sm" data-act="ins-approve" data-id="' + id + '">Approve</button>' +
+              '<button class="btn btn--quiet btn--sm" data-act="ins-hold" data-id="' + id + '">To pending</button>';
+    }
+
+    // Full action set inside the expanded body (adds Delete).
+    var full;
+    if (status === 'pending') {
+      full = '<button class="btn btn--primary btn--sm" data-act="ins-approve" data-id="' + id + '">Approve</button>' +
              '<button class="btn btn--quiet btn--sm" data-act="ins-reject" data-id="' + id + '">Reject</button>';
     } else if (status === 'approved') {
-      acts = '<button class="btn btn--quiet btn--sm" data-act="ins-hold" data-id="' + id + '">Unpublish (hold)</button>' +
+      full = '<button class="btn btn--quiet btn--sm" data-act="ins-hold" data-id="' + id + '">Unpublish (hold)</button>' +
              '<button class="btn btn--quiet btn--sm" data-act="ins-reject" data-id="' + id + '">Reject</button>';
-    } else { // rejected
-      acts = '<button class="btn btn--primary btn--sm" data-act="ins-approve" data-id="' + id + '">Approve</button>' +
+    } else {
+      full = '<button class="btn btn--primary btn--sm" data-act="ins-approve" data-id="' + id + '">Approve</button>' +
              '<button class="btn btn--quiet btn--sm" data-act="ins-hold" data-id="' + id + '">Move to pending</button>';
     }
-    acts += '<button class="btn btn--danger btn--sm" data-act="ins-delete" data-id="' + id + '">Delete</button>';
-    return '<div class="ins-card">' +
-      '<div class="ins-card__head">' +
-        '<span class="ins-card__name">' + esc(it.name || 'Anonymous') + '</span>' +
-        '<span class="ins-role ins-role--' + esc(role) + '">' + esc(roleName) + '</span>' +
-        '<span class="ins-status ins-status--' + esc(status) + '">' + esc(status) + '</span>' +
+    full += '<button class="btn btn--danger btn--sm" data-act="ins-delete" data-id="' + id + '">Delete</button>';
+
+    return '<div class="ins-row" data-id="' + id + '">' +
+      '<div class="ins-row__head">' +
+        '<button class="ins-row__main" type="button" data-toggle="' + id + '" aria-expanded="false">' +
+          '<span class="ins-row__chev" aria-hidden="true">&#9656;</span>' +
+          '<span class="ins-row__text">' +
+            '<span class="ins-row__title">' +
+              '<span class="ins-card__name">' + esc(it.name || 'Anonymous') + '</span>' +
+              '<span class="ins-role ins-role--' + esc(role) + '">' + esc(roleName) + '</span>' +
+              '<span class="ins-status ins-status--' + esc(status) + '">' + esc(status) + '</span>' +
+            '</span>' +
+            '<span class="ins-row__sub">' + insPreview(it) + '</span>' +
+          '</span>' +
+        '</button>' +
+        '<span class="ins-row__quick">' + quick + '</span>' +
       '</div>' +
-      (meta ? '<div class="ins-card__meta">' + meta + '</div>' : '') +
-      blocks +
-      '<div class="ins-card__acts">' + acts + '</div>' +
+      '<div class="ins-row__body" hidden>' +
+        (meta ? '<div class="ins-card__meta">' + meta + '</div>' : '') +
+        blocks +
+        '<div class="ins-card__acts">' + full + '</div>' +
+      '</div>' +
     '</div>';
+  }
+
+  function toggleInsRow(id) {
+    var row = document.querySelector('.ins-row[data-id="' + (window.CSS && CSS.escape ? CSS.escape(id) : id) + '"]');
+    if (!row) return;
+    var body = row.querySelector('.ins-row__body');
+    var main = row.querySelector('.ins-row__main');
+    var open = body.hasAttribute('hidden');
+    if (open) { body.removeAttribute('hidden'); } else { body.setAttribute('hidden', ''); }
+    row.classList.toggle('is-open', open);
+    if (main) main.setAttribute('aria-expanded', open ? 'true' : 'false');
   }
 
   function moderateInsight(id, action, btn) {
@@ -2678,13 +2770,17 @@ select.input { appearance: auto; background: var(--surface); }
   }
 
   function onInsightsClick(e) {
-    var t = e.target.closest ? e.target.closest('[data-act]') : null;
-    if (!t) return;
-    if (t.dataset.act === 'ins-refresh') return loadInsights();
-    if (t.dataset.act === 'ins-approve') return moderateInsight(t.dataset.id, 'approve', t);
-    if (t.dataset.act === 'ins-reject') return moderateInsight(t.dataset.id, 'reject', t);
-    if (t.dataset.act === 'ins-hold') return moderateInsight(t.dataset.id, 'hold', t);
-    if (t.dataset.act === 'ins-delete') return moderateInsight(t.dataset.id, 'delete', t);
+    var act = e.target.closest ? e.target.closest('[data-act]') : null;
+    if (act) {
+      if (act.dataset.act === 'ins-refresh') return loadInsights();
+      if (act.dataset.act === 'ins-approve') return moderateInsight(act.dataset.id, 'approve', act);
+      if (act.dataset.act === 'ins-reject') return moderateInsight(act.dataset.id, 'reject', act);
+      if (act.dataset.act === 'ins-hold') return moderateInsight(act.dataset.id, 'hold', act);
+      if (act.dataset.act === 'ins-delete') return moderateInsight(act.dataset.id, 'delete', act);
+      return;
+    }
+    var tog = e.target.closest ? e.target.closest('[data-toggle]') : null;
+    if (tog) return toggleInsRow(tog.getAttribute('data-toggle'));
   }
 
   function wireInsights() {
