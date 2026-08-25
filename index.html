@@ -608,6 +608,22 @@ select.input { appearance: auto; background: var(--surface); }
 .an-topic__name { flex: 1 1 auto; min-width: 0; text-transform: capitalize; }
 .an-topic__stats { color: #6b7280; font-size: 0.78rem; }
 .an-empty { text-align: center; color: #6b7280; padding: 30px; }
+
+/* ---- Analytics overview charts ---- */
+.an-overview { display: grid; grid-template-columns: 1fr 1fr; gap: 14px; margin-bottom: 18px; }
+.an-chart-card { border: 1px solid var(--line, #e5e7eb); border-radius: 12px; padding: 14px 16px; background: #fff; }
+.an-chart-card h3 { margin: 0 0 10px; font-size: 0.9rem; }
+.an-chart-card .an-chart-note { color: #9ca3af; font-size: 0.75rem; margin: 0 0 10px; }
+.chart { display: flex; flex-direction: column; gap: 8px; }
+.chart__row { display: grid; grid-template-columns: 92px 1fr 44px; align-items: center; gap: 8px; }
+.chart__label { font-size: 0.82rem; color: #374151; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.chart__track { height: 12px; border-radius: 999px; background: #eef0f4; overflow: hidden; }
+.chart__fill { display: block; height: 100%; border-radius: 999px; }
+.chart__fill--bad { background: #ef4444; }
+.chart__fill--mid { background: #f59e0b; }
+.chart__fill--ok  { background: #22c55e; }
+.chart__val { font-size: 0.82rem; font-weight: 700; text-align: right; }
+@media (max-width: 720px) { .an-overview { grid-template-columns: 1fr; } }
 </style>
 <!-- Boss-Battle "steps" question type: self-hosted KaTeX (CDN blocked by CSP)
      + the shared render helper. Loaded here so window.katex / window.MathText
@@ -2884,6 +2900,43 @@ select.input { appearance: auto; background: var(--surface); }
   function anFill(acc) { return acc < 0.5 ? 'an-fill--bad' : (acc < 0.75 ? 'an-fill--mid' : 'an-fill--ok'); }
   function anDistinct(arr) { var seen = {}, out = []; arr.forEach(function (x) { if (x != null && x !== '' && !seen[x]) { seen[x] = 1; out.push(x); } }); return out; }
 
+  // ---- overview charts (cohort birds-eye: where are students struggling) ----
+  function anChart(items) {
+    if (!items.length) return '<p class="muted" style="font-size:0.82rem">Not enough data yet.</p>';
+    return '<div class="chart">' + items.map(function (it) {
+      var pct = Math.round(it.value * 100);
+      var cls = it.value < 0.5 ? 'bad' : (it.value < 0.75 ? 'mid' : 'ok');
+      return '<div class="chart__row">' +
+        '<span class="chart__label">' + esc(it.label) + '</span>' +
+        '<span class="chart__track"><i class="chart__fill chart__fill--' + cls + '" style="width:' + pct + '%"></i></span>' +
+        '<span class="chart__val">' + pct + '%</span>' +
+      '</div>';
+    }).join('') + '</div>';
+  }
+  // attempt-weighted average accuracy, grouped by a key; sorted hardest-first.
+  function anGroupAvg(keyFn) {
+    var g = {};
+    anData.forEach(function (c) {
+      if (c.lowSample) return;
+      var k = keyFn(c); if (k == null || k === '') return;
+      if (!g[k]) g[k] = { w: 0, att: 0 };
+      g[k].w += c.accuracy * c.attemptCount; g[k].att += c.attemptCount;
+    });
+    return Object.keys(g).map(function (k) { return { key: k, value: g[k].att ? g[k].w / g[k].att : 0 }; })
+      .sort(function (a, b) { return a.value - b.value; });
+  }
+  function anOverviewHtml() {
+    var bySub = anGroupAvg(function (c) { return c.subjectKey; }).map(function (x) { return { label: anSubjectLabel(x.key), value: x.value }; });
+    var byClass = anGroupAvg(function (c) { return c.classLevel; }).map(function (x) { return { label: 'Class ' + x.key, value: x.value }; });
+    if (!bySub.length && !byClass.length) return '';
+    return '<div class="an-overview">' +
+      '<div class="an-chart-card"><h3>Hardest subjects</h3>' +
+        '<p class="an-chart-note">Average accuracy across all attempts — lower = harder for students.</p>' + anChart(bySub) + '</div>' +
+      '<div class="an-chart-card"><h3>By class</h3>' +
+        '<p class="an-chart-note">Average accuracy per class.</p>' + anChart(byClass) + '</div>' +
+    '</div>';
+  }
+
   // ---- cascade filter dropdowns, all derived from anData ----
   function anBuildClassOptions() {
     var sel = qs('#an-class'); if (!sel) return; var cur = sel.value;
@@ -2970,11 +3023,16 @@ select.input { appearance: auto; background: var(--surface); }
       if (fChapter && c.chapterRef !== fChapter) return false;
       return true;
     });
-    if (!list.length) {
+    if (!anData.length) {
       host.innerHTML = '<div class="an-empty"><strong>No data yet</strong><br>Once students play these chapters, the hardest ones show up here automatically.</div>';
       return;
     }
-    host.innerHTML = list.map(anChapterRow).join('');
+    var overview = anOverviewHtml();
+    if (!list.length) {
+      host.innerHTML = overview + '<div class="an-empty">No chapters match this filter.</div>';
+      return;
+    }
+    host.innerHTML = overview + list.map(anChapterRow).join('');
   }
 
   function toggleAnRow(ref) {
