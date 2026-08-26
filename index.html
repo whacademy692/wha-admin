@@ -624,6 +624,9 @@ select.input { appearance: auto; background: var(--surface); }
 .chart__fill--ok  { background: #22c55e; }
 .chart__val { font-size: 0.82rem; font-weight: 700; text-align: right; }
 @media (max-width: 720px) { .an-overview { grid-template-columns: 1fr; } }
+.an-trend-card { margin-bottom: 16px; }
+.an-trend-chart { margin-top: 10px; }
+.an-trend-chart svg { width: 100%; height: auto; display: block; }
 </style>
 <!-- Boss-Battle "steps" question type: self-hosted KaTeX (CDN blocked by CSP)
      + the shared render helper. Loaded here so window.katex / window.MathText
@@ -2880,6 +2883,64 @@ select.input { appearance: auto; background: var(--surface); }
   // and chapter appear here automatically — nothing to hardcode or maintain.
   // ==========================================================================
   var anData = [];
+  var anTrend = [];
+
+  // parse "class6/subjects/math/slug" -> { classLevel, subjectKey }
+  function anParseRef(ref) {
+    var p = String(ref).split('/');
+    var cl = null;
+    if (p[0] && p[0].indexOf('class') === 0) { var n = parseInt(p[0].replace('class', ''), 10); cl = isNaN(n) ? null : n; }
+    return { classLevel: cl, subjectKey: p.length >= 3 ? p[2] : '' };
+  }
+
+  var AN_MONTHS = ['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun', 'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec'];
+  function anFmtDate(d) { var p = String(d).split('-'); return p.length === 3 ? (parseInt(p[2], 10) + ' ' + (AN_MONTHS[parseInt(p[1], 10) - 1] || '')) : d; }
+  function anAccColor(a) { return a < 0.5 ? '#ef4444' : (a < 0.75 ? '#f59e0b' : '#22c55e'); }
+
+  function anComputeTrend() {
+    var c = qs('#an-class').value, s = qs('#an-subject').value, ch = qs('#an-chapter').value;
+    var byDate = {};
+    anTrend.forEach(function (r) {
+      var m = anParseRef(r.chapterRef);
+      if (c && String(m.classLevel) !== c) return;
+      if (s && m.subjectKey !== s) return;
+      if (ch && r.chapterRef !== ch) return;
+      if (!byDate[r.date]) byDate[r.date] = { total: 0, correct: 0 };
+      byDate[r.date].total += r.total; byDate[r.date].correct += r.correct;
+    });
+    return Object.keys(byDate).sort().map(function (d) { var x = byDate[d]; return { date: d, accuracy: x.total ? x.correct / x.total : 0 }; });
+  }
+
+  function anLineChartSVG(points) {
+    var W = 800, H = 240, padL = 40, padR = 14, padT = 14, padB = 34;
+    var plotW = W - padL - padR, plotH = H - padT - padB, n = points.length;
+    function X(i) { return n <= 1 ? padL + plotW / 2 : padL + (i / (n - 1)) * plotW; }
+    function Y(a) { return padT + (1 - a) * plotH; }
+    var grid = '';
+    [0, 0.25, 0.5, 0.75, 1].forEach(function (v) {
+      var yy = Y(v);
+      grid += '<line x1="' + padL + '" y1="' + yy + '" x2="' + (W - padR) + '" y2="' + yy + '" stroke="#e6e6f0" stroke-width="1"/>' +
+        '<text x="' + (padL - 6) + '" y="' + (yy + 3) + '" text-anchor="end" font-size="10" fill="#6b7280">' + Math.round(v * 100) + '%</text>';
+    });
+    var step = n <= 8 ? 1 : Math.ceil(n / 7), xlab = '';
+    points.forEach(function (pt, i) {
+      if (i % step === 0 || i === n - 1) xlab += '<text x="' + X(i) + '" y="' + (H - padB + 16) + '" text-anchor="middle" font-size="10" fill="#6b7280">' + anFmtDate(pt.date) + '</text>';
+    });
+    var defs = '<defs><linearGradient id="anAccGrad" x1="0" y1="' + padT + '" x2="0" y2="' + (padT + plotH) + '" gradientUnits="userSpaceOnUse">' +
+      '<stop offset="0" stop-color="#22c55e"/><stop offset="0.5" stop-color="#f59e0b"/><stop offset="1" stop-color="#ef4444"/></linearGradient></defs>';
+    var line = '';
+    if (n >= 2) line = '<polyline points="' + points.map(function (pt, i) { return X(i) + ',' + Y(pt.accuracy); }).join(' ') + '" fill="none" stroke="url(#anAccGrad)" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"/>';
+    var dots = points.map(function (pt, i) { return '<circle cx="' + X(i) + '" cy="' + Y(pt.accuracy) + '" r="' + (n === 1 ? 4 : 3) + '" fill="' + anAccColor(pt.accuracy) + '"/>'; }).join('');
+    return '<svg viewBox="0 0 ' + W + ' ' + H + '" role="img" aria-label="Accuracy over time">' + defs + grid + line + dots + xlab + '</svg>';
+  }
+
+  function anTrendCardHtml() {
+    var pts = anComputeTrend();
+    var body = pts.length ? anLineChartSVG(pts) : '<p class="an-chart-note" style="text-align:center;padding:22px 0;">No attempts for this selection yet.</p>';
+    return '<div class="an-chart-card an-trend-card"><h3>Accuracy over time</h3>' +
+      '<p class="an-chart-note">Whole cohort. Higher is greener, lower is redder. The Class / Subject / Chapter filters above apply.</p>' +
+      '<div class="an-trend-chart">' + body + '</div></div>';
+  }
 
   // Display-only prettifier for known subject keys; anything unknown just gets
   // humanized, so a brand-new subject still shows up with a sensible label.
@@ -2972,6 +3033,7 @@ select.input { appearance: auto; background: var(--surface); }
     authed('analytics/contentDifficulty', {})
       .then(function (d) {
         anData = (d && d.chapters) || [];
+        anTrend = (d && d.trend) || [];
         anBuildClassOptions(); anBuildSubjectOptions(); anBuildChapterOptions();
         renderAnalytics();
       })
@@ -3029,10 +3091,10 @@ select.input { appearance: auto; background: var(--surface); }
     }
     var overview = anOverviewHtml();
     if (!list.length) {
-      host.innerHTML = overview + '<div class="an-empty">No chapters match this filter.</div>';
+      host.innerHTML = anTrendCardHtml() + overview + '<div class="an-empty">No chapters match this filter.</div>';
       return;
     }
-    host.innerHTML = overview + list.map(anChapterRow).join('');
+    host.innerHTML = anTrendCardHtml() + overview + list.map(anChapterRow).join('');
   }
 
   function toggleAnRow(ref) {
