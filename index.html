@@ -502,6 +502,11 @@ select.input { appearance: auto; background: var(--surface); }
 /* ---- Insights moderation ---- */
 .ins-controls { display: flex; gap: 8px; align-items: center; }
 .ins-filter { max-width: 150px; }
+/* Inline admin edit form for an insight */
+.ins-edit { display: flex; flex-direction: column; gap: 6px; }
+.ins-edit__hint { font-size: 0.82rem; color: var(--muted, #6b7280); margin: 2px 0 8px; }
+.ins-edit__label { font-size: 0.8rem; font-weight: 600; color: var(--muted, #6b7280); margin-top: 6px; }
+.ins-edit__area { width: 100%; resize: vertical; min-height: 74px; font: inherit; line-height: 1.5; }
 .ins-card {
   border: 1px solid var(--line, #e5e7eb);
   border-radius: 12px;
@@ -2808,6 +2813,7 @@ select.input { appearance: auto; background: var(--surface); }
       full = '<button class="btn btn--primary btn--sm" data-act="ins-approve" data-id="' + id + '">Approve</button>' +
              '<button class="btn btn--quiet btn--sm" data-act="ins-hold" data-id="' + id + '">Move to pending</button>';
     }
+    full += '<button class="btn btn--quiet btn--sm" data-act="ins-edit" data-id="' + id + '">Edit</button>';
     full += '<button class="btn btn--danger btn--sm" data-act="ins-delete" data-id="' + id + '">Delete</button>';
 
     return '<div class="ins-row" data-id="' + id + '">' +
@@ -2854,6 +2860,70 @@ select.input { appearance: auto; background: var(--surface); }
       .catch(function (e) { fail(e, 'Could not update the insight.'); busy(btn, false); });
   }
 
+  // ---- Admin edit: fix wording / spacing on any insight, any time ----------
+  // Builds an inline form of textareas (role-aware labels), pre-filled with the
+  // current text. Saving sends only the edited text fields to insights/edit;
+  // role, status and the submitter's name are never changed.
+  function insEditForm(it) {
+    var role = String(it.role || '');
+    var id = esc(it.insightId);
+    function ta(label, field, val) {
+      return '<label class="ins-edit__label">' + esc(label) + '</label>' +
+             '<textarea class="input ins-edit__area" data-edit-field="' + field + '" rows="4">' +
+             esc(val == null ? '' : String(val)) + '</textarea>';
+    }
+    var rows = ta('Topic', 'topic', it.topic);
+    if (role === 'student') {
+      rows += ta('What was difficult', 'field1', it.field1) +
+              ta('How they solved it', 'field2', it.field2);
+    } else if (role === 'parent') {
+      rows += ta('Challenges', 'field1', it.field1) +
+              ta('Their approach', 'field2', it.field2) +
+              ta('Expectations', 'field3', it.field3);
+    } else {
+      rows += ta('Teaching tips', 'field1', it.field1) +
+              ta('Common mistakes', 'field2', it.field2) +
+              ta('Exam tips', 'field3', it.field3);
+    }
+    return '<div class="ins-edit" data-edit-id="' + id + '">' +
+      '<p class="ins-edit__hint">Fix the wording or spacing below. Delete extra ' +
+      'blank lines to remove big gaps. The name, role and status are not changed.</p>' +
+      rows +
+      '<div class="ins-card__acts">' +
+        '<button class="btn btn--primary btn--sm" data-act="ins-edit-save" data-id="' + id + '">Save changes</button>' +
+        '<button class="btn btn--quiet btn--sm" data-act="ins-edit-cancel" data-id="' + id + '">Cancel</button>' +
+      '</div>' +
+    '</div>';
+  }
+
+  function openInsEdit(id) {
+    var it = (insList || []).filter(function (x) { return String(x.insightId) === String(id); })[0];
+    if (!it) return;
+    var sel = (window.CSS && CSS.escape) ? CSS.escape(id) : id;
+    var row = document.querySelector('.ins-row[data-id="' + sel + '"]');
+    if (!row) return;
+    var body = row.querySelector('.ins-row__body');
+    if (!body) return;
+    if (body.hasAttribute('hidden')) { body.removeAttribute('hidden'); row.classList.add('is-open'); }
+    body.innerHTML = insEditForm(it);
+    var first = body.querySelector('textarea');
+    if (first) first.focus();
+  }
+
+  function saveInsEdit(id, btn) {
+    var sel = (window.CSS && CSS.escape) ? CSS.escape(id) : id;
+    var row = document.querySelector('.ins-row[data-id="' + sel + '"]');
+    if (!row) return;
+    var fields = {};
+    row.querySelectorAll('[data-edit-field]').forEach(function (el) {
+      fields[el.getAttribute('data-edit-field')] = el.value;
+    });
+    busy(btn, true);
+    authed('insights/edit', { insightId: id, fields: fields })
+      .then(function () { toast('Saved.', 'ok'); loadInsights(); })
+      .catch(function (e) { fail(e, 'Could not save the changes.'); busy(btn, false); });
+  }
+
   function onInsightsClick(e) {
     var act = e.target.closest ? e.target.closest('[data-act]') : null;
     if (act) {
@@ -2862,6 +2932,9 @@ select.input { appearance: auto; background: var(--surface); }
       if (act.dataset.act === 'ins-reject') return moderateInsight(act.dataset.id, 'reject', act);
       if (act.dataset.act === 'ins-hold') return moderateInsight(act.dataset.id, 'hold', act);
       if (act.dataset.act === 'ins-delete') return moderateInsight(act.dataset.id, 'delete', act);
+      if (act.dataset.act === 'ins-edit') return openInsEdit(act.dataset.id);
+      if (act.dataset.act === 'ins-edit-save') return saveInsEdit(act.dataset.id, act);
+      if (act.dataset.act === 'ins-edit-cancel') return loadInsights();
       return;
     }
     var tog = e.target.closest ? e.target.closest('[data-toggle]') : null;
