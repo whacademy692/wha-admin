@@ -2753,11 +2753,13 @@ select.input { appearance: auto; background: var(--surface); }
 
   function insMeta(it) {
     var bits = [];
+    if (it.category === 'general') bits.push('General');
     if (it.role === 'teacher' && it.experienceYears) bits.push(esc(it.experienceYears) + ' yrs exp');
     if (it.classLevel) bits.push('Class ' + esc(it.classLevel));
     if (it.subject) bits.push(esc(it.subject));
     if (it.chapter) bits.push(esc(it.chapter));
     if (it.schools) bits.push(esc(it.schools));
+    if (it.country) bits.push(esc(it.country));
     return bits.join(' · ');
   }
 
@@ -2778,7 +2780,9 @@ select.input { appearance: auto; background: var(--surface); }
     var id = esc(it.insightId);
 
     var blocks = insBlock('Topic', it.topic);
-    if (role === 'student') {
+    if (it.category === 'general') {
+      blocks = insBlock('Feedback', it.field1);
+    } else if (role === 'student') {
       blocks += insBlock('What was difficult', it.field1) + insBlock('How they solved it', it.field2);
     } else if (role === 'parent') {
       blocks += insBlock('Challenges', it.field1) + insBlock('Their approach', it.field2) + insBlock('Expectations', it.field3);
