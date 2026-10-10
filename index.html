@@ -10,7 +10,7 @@
      being framed (clickjacking). 'unsafe-inline' is required — the whole panel is
      one inline <script> + inline styles. challenges.cloudflare.com = Turnstile
      (S1); script.google.com = the API. -->
-<meta http-equiv="Content-Security-Policy" content="default-src 'self'; base-uri 'self'; object-src 'none'; frame-ancestors 'none'; script-src 'self' 'unsafe-inline' https://challenges.cloudflare.com; style-src 'self' 'unsafe-inline'; img-src 'self' data:; connect-src 'self' https://script.google.com https://script.googleusercontent.com https://challenges.cloudflare.com; frame-src https://challenges.cloudflare.com">
+<meta http-equiv="Content-Security-Policy" content="default-src 'self'; base-uri 'self'; object-src 'none'; frame-ancestors 'none'; script-src 'self' 'unsafe-inline' https://challenges.cloudflare.com; style-src 'self' 'unsafe-inline'; img-src 'self' data:; connect-src 'self' https://gbgcaonmdekumluwgwvn.supabase.co https://script.google.com https://script.googleusercontent.com https://challenges.cloudflare.com; frame-src https://challenges.cloudflare.com">
 <!-- Audit S1: Cloudflare Turnstile on admin sign-in. OFF until you paste the SITE
      key below (and set TURNSTILE_SECRET_KEY + FLAG_CAPTCHA on the backend). -->
 <script>
@@ -502,6 +502,83 @@ select.input { appearance: auto; background: var(--surface); }
 /* ---- Insights moderation ---- */
 .ins-controls { display: flex; gap: 8px; align-items: center; }
 .ins-filter { max-width: 150px; }
+/* Insights pager (classic 10-per-page) */
+.ins-pager { display: flex; align-items: center; justify-content: space-between; gap: 12px; flex-wrap: wrap; margin: 6px 0 18px; }
+.ins-pager__info { color: var(--muted, #6b7280); font-size: 0.85rem; }
+.ins-pager__btns { display: flex; align-items: center; gap: 6px; flex-wrap: wrap; }
+.ins-pager__num { min-width: 34px; height: 34px; padding: 0 8px; border: 1px solid var(--line, #e5e7eb); background: #fff; color: inherit; border-radius: 8px; cursor: pointer; font: inherit; }
+.ins-pager__num:hover { background: var(--hover, #f3f4f6); }
+.ins-pager__num.is-current { background: #0f766e; border-color: #0f766e; color: #fff; font-weight: 700; }
+.ins-pager__gap { padding: 0 4px; color: var(--muted, #6b7280); }
+/* Student cards (replace the wide table; no horizontal scroll) */
+.stu-list { display: flex; flex-direction: column; gap: 12px; }
+.stu-card { border: 1px solid var(--line, #e5e7eb); border-radius: 14px; background: #fff; overflow: hidden; transition: box-shadow .18s, border-color .18s; }
+.stu-card:hover { box-shadow: 0 6px 20px rgba(2,6,23,.07); }
+.stu-card.is-open { border-color: #0f766e; box-shadow: 0 10px 30px rgba(2,6,23,.10); }
+.stu-head { display: flex; align-items: center; gap: 14px; padding: 14px 16px; cursor: pointer; }
+.stu-head__main { flex: 1 1 auto; min-width: 0; }
+.stu-head__name { font-weight: 700; font-size: 1rem; }
+.stu-head__sub { color: var(--muted,#6b7280); font-size: .82rem; font-family: ui-monospace,Menlo,Consolas,monospace; }
+.stu-head__right { flex: 0 0 auto; display: flex; align-items: center; gap: 8px; flex-wrap: wrap; justify-content: flex-end; }
+.stu-caret { flex: 0 0 auto; color: var(--muted,#9ca3af); transition: transform .18s; }
+.stu-card.is-open .stu-caret { transform: rotate(180deg); }
+.stu-body { display: none; padding: 2px 16px 16px; border-top: 1px solid var(--line,#eef2f7); }
+.stu-card.is-open .stu-body { display: block; }
+.stu-dl { display: grid; grid-template-columns: max-content 1fr; gap: 6px 16px; margin: 12px 0 0; }
+.stu-dl dt { color: var(--muted,#6b7280); font-size: .82rem; }
+.stu-dl dd { margin: 0; font-size: .9rem; word-break: break-word; }
+.stu-sec { font-size: .72rem; font-weight: 800; letter-spacing: .06em; text-transform: uppercase; color: var(--muted,#9ca3af); margin: 14px 0 2px; }
+@media (max-width: 560px){ .stu-head{flex-wrap:wrap} .stu-dl{grid-template-columns:1fr} .stu-dl dt{margin-top:6px} }
+.stu-body__acts { display:flex; justify-content:flex-end; margin-top:10px; }
+.stu-edit { display:flex; flex-direction:column; gap:10px; margin-top:10px; }
+.stu-edit__hint { font-size:.8rem; color:var(--muted,#6b7280); margin:0 0 4px; line-height:1.5; }
+.stu-edit__row { display:grid; grid-template-columns:170px 1fr; align-items:center; gap:10px; }
+.stu-edit__lbl { font-size:.82rem; color:var(--muted,#6b7280); }
+.stu-edit__row .input { width:100%; }
+.stu-edit__acts { display:flex; gap:8px; justify-content:flex-end; margin-top:6px; }
+@media (max-width:560px){ .stu-edit__row{grid-template-columns:1fr; gap:4px} }
+.ed-chips { display:flex; flex-wrap:wrap; gap:8px; }
+.ed-chip { display:inline-flex; align-items:center; gap:6px; border:1px solid var(--line,#e5e7eb); border-radius:999px; padding:6px 12px; cursor:pointer; font-size:.85rem; user-select:none; }
+.ed-chip input { margin:0; }
+.ed-chip:has(input:checked) { background:#0f766e; border-color:#0f766e; color:#fff; }
+/* Fee voucher */
+.vmodal{position:fixed;inset:0;z-index:10001;background:rgba(15,23,42,.5);display:flex;align-items:flex-start;justify-content:center;overflow:auto;padding:28px 16px;}
+.vmodal__card{background:#fff;border-radius:14px;max-width:560px;width:100%;box-shadow:0 24px 60px rgba(0,0,0,.3);padding:16px;}
+.vmodal__bar{display:flex;align-items:center;justify-content:space-between;margin-bottom:12px;}
+.vform{display:grid;grid-template-columns:1fr 1fr;gap:10px;margin-bottom:14px;}
+.vform label{display:flex;flex-direction:column;gap:4px;font-size:.8rem;color:var(--muted,#6b7280);}
+.voucher-sheet{border:1.5px solid #0f766e;border-radius:12px;padding:20px;color:#0f172a;}
+.vh{display:flex;align-items:baseline;justify-content:space-between;border-bottom:2px solid #0f766e;padding-bottom:10px;margin-bottom:12px;}
+.vh__brand{font-size:1.3rem;font-weight:800;color:#0f766e;}
+.vh__title{font-size:1rem;font-weight:700;letter-spacing:.08em;text-transform:uppercase;color:#334155;}
+.vmeta{font-size:.82rem;color:#475569;margin-bottom:12px;}
+.vtab{width:100%;border-collapse:collapse;}
+.vtab td{padding:7px 4px;border-bottom:1px solid #e2e8f0;font-size:.92rem;vertical-align:top;}
+.vtab td:first-child{color:#64748b;width:42%;}
+.vtab td:last-child{font-weight:600;}
+.vamt{margin-top:14px;font-size:1.15rem;}
+.vamt b{color:#0f766e;}
+.vnote{margin-top:10px;font-size:.9rem;color:#334155;}
+.vfoot{margin-top:16px;font-size:.78rem;color:#64748b;border-top:1px dashed #cbd5e1;padding-top:10px;}
+@media (max-width:560px){ .vform{grid-template-columns:1fr} }
+@media print {
+  body * { visibility:hidden !important; }
+  #vmodal, #vmodal * { visibility:visible !important; }
+  #vmodal{position:absolute;inset:auto;left:0;top:0;background:#fff;padding:0;}
+  #vmodal .no-print{display:none !important;}
+  #vmodal .vmodal__card{box-shadow:none;max-width:none;padding:0;}
+  .voucher-sheet{border:none;}
+}
+/* Teacher PIN field */
+.pin-wrap { position: relative; }
+.pin-wrap .input { padding-right: 42px; }
+.pin-eye { position: absolute; right: 8px; top: 50%; transform: translateY(-50%); border: 0; background: transparent; cursor: pointer; font-size: 16px; line-height: 1; opacity: .7; }
+.pin-eye:hover { opacity: 1; }
+.pin-rules { list-style: none; margin: 8px 0 0; padding: 0; display: flex; flex-wrap: wrap; gap: 6px 14px; }
+.pin-rules li { font-size: .78rem; color: var(--muted,#9ca3af); position: relative; padding-left: 16px; }
+.pin-rules li::before { content: '\25CB'; position: absolute; left: 0; }
+.pin-rules li.ok { color: #0f766e; }
+.pin-rules li.ok::before { content: '\25CF'; }
 /* Inline admin edit form for an insight */
 .ins-edit { display: flex; flex-direction: column; gap: 6px; }
 .ins-edit__hint { font-size: 0.82rem; color: var(--muted, #6b7280); margin: 2px 0 8px; }
@@ -706,6 +783,16 @@ select.input { appearance: auto; background: var(--surface); }
   .mf-modal__actions { display:flex; justify-content:flex-end; gap:0.5rem; }
 
 </style>
+<link rel="stylesheet" href="assets/css/rechecking.css">
+  <style>
+    .cell-cb { width:34px; text-align:center; }
+    .cell-cb input { width:16px; height:16px; cursor:pointer; }
+    .cell-dates { font-size:.72rem; color:var(--muted,#64748b); white-space:nowrap; line-height:1.4; }
+    .cell-dates b { color:#475569; font-weight:600; }
+    .stu-toolbar { display:flex; align-items:center; gap:.75rem; margin:-.4rem 0 1rem; flex-wrap:wrap; }
+    .stu-toolbar select { max-width:200px; }
+    .bulk-bar { display:flex; align-items:center; gap:.6rem; margin-left:auto; font-size:.85rem; color:#334155; }
+  </style>
 </head>
 
 <body>
@@ -782,13 +869,17 @@ select.input { appearance: auto; background: var(--surface); }
     </div>
 
     <nav class="side__nav">
+      <button class="side__item" data-view="overview" type="button">
+        <svg viewBox="0 0 24 24" stroke-width="2" aria-hidden="true"><path stroke-linecap="round" stroke-linejoin="round" d="M4 20V10M10 20V4M16 20v-7M22 20H2"/></svg>
+        Overview
+      </button>
       <button class="side__item is-active" data-view="students" type="button">
         <svg viewBox="0 0 24 24" stroke-width="2" aria-hidden="true"><circle cx="12" cy="8" r="4"/><path stroke-linecap="round" d="M4 21c0-4 4-6 8-6s8 2 8 6"/></svg>
         Students
       </button>
-      <button class="side__item" data-view="overview" type="button">
-        <svg viewBox="0 0 24 24" stroke-width="2" aria-hidden="true"><path stroke-linecap="round" stroke-linejoin="round" d="M4 20V10M10 20V4M16 20v-7M22 20H2"/></svg>
-        Overview
+      <button class="side__item" data-view="archived" type="button">
+        <svg viewBox="0 0 24 24" stroke-width="2" aria-hidden="true"><path stroke-linecap="round" stroke-linejoin="round" d="M3 7h18M5 7l1 13h12l1-13M9 11v6M15 11v6M9 7V4h6v3"/></svg>
+        Archived
       </button>
       <button class="side__item" data-view="papers" type="button">
         <svg viewBox="0 0 24 24" stroke-width="2" aria-hidden="true"><path stroke-linecap="round" stroke-linejoin="round" d="M12 3l7 3v5c0 4.5-3 7.5-7 9-4-1.5-7-4.5-7-9V6l7-3z"/><path stroke-linecap="round" stroke-linejoin="round" d="M9.5 12l1.8 1.8L15 9.8"/></svg>
@@ -845,7 +936,30 @@ select.input { appearance: auto; background: var(--surface); }
         <button class="btn btn--primary" type="submit">Search</button>
       </form>
 
+      <div class="stu-toolbar">
+        <label class="sr-only" for="f-filter">Filter students</label>
+        <select class="input" id="f-filter">
+          <option value="all">All</option>
+          <option value="no-account">No account yet</option>
+          <option value="pending">Pending</option>
+          <option value="active">Active</option>
+          <option value="suspended">Suspended</option>
+          <option value="expired">Expired</option>
+        </select>
+      </div>
+
       <div id="results" aria-live="polite"></div>
+    </section>
+
+    <section data-panel="archived" hidden>
+      <header class="head">
+        <div>
+          <h1 class="head__title">Archived</h1>
+          <p class="head__sub">Deleted enrollments are kept here so you can restore them. Registered accounts are never auto-deleted.</p>
+        </div>
+        <button class="btn btn--quiet btn--sm" data-act="refresh-archived" type="button">Refresh</button>
+      </header>
+      <div id="archived-results" aria-live="polite"></div>
     </section>
 
     <section data-panel="overview" hidden>
@@ -1045,14 +1159,27 @@ select.input { appearance: auto; background: var(--surface); }
           </div>
           <div class="field">
             <label class="field__label" for="tc-pin">Initial PIN</label>
-            <input class="input" id="tc-pin" inputmode="numeric" placeholder="4–8 digits">
+            <div class="pin-wrap">
+              <input class="input" id="tc-pin" type="password" maxlength="16" autocomplete="new-password" placeholder="8–16, letters & numbers">
+              <button type="button" class="pin-eye" data-act="tc-eye" aria-label="Show or hide PIN">👁</button>
+            </div>
+            <ul class="pin-rules" id="tc-pin-rules">
+              <li data-rule="len">8–16 characters</li>
+              <li data-rule="num">1 number</li>
+              <li data-rule="letter">1 letter</li>
+            </ul>
             <span class="field__hint">You share this with the teacher; they use it to sign in.</span>
           </div>
         </div>
         <div class="field">
-          <label class="field__label" for="tc-subjects">Subjects <span class="muted">(comma-separated)</span></label>
-          <input class="input" id="tc-subjects" list="ba-subjects" placeholder="e.g. Mathematics, Physics">
-          <span class="field__hint">Must match the subject names on the papers (e.g. Science, Mathematics).</span>
+          <label class="field__label">Subjects <span class="muted">(pick one or more)</span></label>
+          <div class="ed-chips" id="tc-subject-chips"></div>
+          <span class="field__hint">Must match the subject names on the papers.</span>
+        </div>
+        <div class="field">
+          <label class="field__label">Classes <span class="muted">(optional &mdash; empty = all classes)</span></label>
+          <div class="ed-chips" id="tc-class-chips"></div>
+          <span class="field__hint">Teacher sees only their subjects for these classes (grading &amp; rechecks).</span>
         </div>
         <div class="paper-acts">
           <button class="btn btn--primary" type="button" id="tc-create">Create teacher</button>
@@ -1113,6 +1240,7 @@ select.input { appearance: auto; background: var(--surface); }
       </header>
 
       <div id="ins-list"><p class="muted">Loading…</p></div>
+      <div id="ins-pager" class="ins-pager" hidden></div>
     </section>
 
     <section data-panel="analytics" hidden>
@@ -1216,7 +1344,7 @@ select.input { appearance: auto; background: var(--surface); }
   // CONFIG — see the note at the top of this file. These two values also live
   // in the student site's assets/js/api.js. Change both together.
   // ==========================================================================
-  var API_BASE_URL = 'https://script.google.com/macros/s/AKfycbxjaqW5hmUk6B5gYW3hRjAfsPrbrdZB4a3B3VfJRvfKcfepz4WPYIX_aCVKS-STmiwQIA/exec';
+  var API_BASE_URL = 'https://gbgcaonmdekumluwgwvn.supabase.co/functions/v1/api';
   var API_KEY = 'Jdb-iJByoQ-WA0UwlQrorQOH77buDQjepPH0y2SsDyo';
 
   // The admin session is stored under its own key, never the student site's
@@ -1280,6 +1408,8 @@ select.input { appearance: auto; background: var(--surface); }
   var STATUSES = ['Active', 'Pending', 'Suspended', 'Expired'];
 
   var results = [];   // rows currently on screen
+  var stuPage = 1;
+  var STU_PAGE_SIZE = 10;
   var pendingRow = null;
 
   // ---------------------------------------------------------------- helpers
@@ -1337,7 +1467,8 @@ select.input { appearance: auto; background: var(--surface); }
     el.className = 'toast' + (kind ? ' toast--' + kind : '');
     el.textContent = message;
     host.appendChild(el);
-    setTimeout(function () { el.remove(); }, kind === 'bad' ? 6000 : 4000);
+    var _d = Math.max(6000, Math.min(20000, Math.round(3500 + String(message || '').length * 55)));
+    setTimeout(function () { el.remove(); }, _d);
   }
 
   function busy(button, isBusy) {
@@ -1400,7 +1531,13 @@ select.input { appearance: auto; background: var(--surface); }
     p.token = getToken();
     return call(operation, p);
   }
-
+window.WHAAdminRecheckBridge = {
+  authed: authed,
+  toast: toast,
+  fail: fail,
+  esc: esc,
+  busy: busy
+};
   function isAuthError(err) {
     var c = err && err.code;
     return c === 'AUTH_001' || c === 'AUTH_002' || c === 'AUTH_003' || c === 'AUTH_004';
@@ -1486,13 +1623,265 @@ select.input { appearance: auto; background: var(--surface); }
              '<span class="bar__value">' + esc(byClass[level]) + '</span></li>';
     }).join('');
 
+    var bySchool = stats.bySchool || {};
+    var schoolRows = Object.keys(bySchool).sort(function (a, b) {
+      return (bySchool[b] || 0) - (bySchool[a] || 0) || a.localeCompare(b);
+    }).map(function (name) {
+      return '<li class="bar"><span>' + esc(name) + '</span><span class="bar__value">' + esc(bySchool[name]) + '</span></li>';
+    }).join('');
+
     host.innerHTML = '<div class="tiles">' + tiles + '</div>' +
-      (rows ? '<div class="panel"><h2 class="panel__title">By class</h2><ul class="bars">' + rows + '</ul></div>' : '');
+      (rows ? '<div class="panel"><h2 class="panel__title">By class</h2><ul class="bars">' + rows + '</ul></div>' : '') +
+      (schoolRows ? '<div class="panel"><h2 class="panel__title">Schools (from enrollment forms)</h2><ul class="bars">' + schoolRows + '</ul></div>' : '');
   }
+
+  function prettyKey(k){ return String(k).replace(/_/g,' ').replace(/([a-z0-9])([A-Z])/g,'$1 $2').replace(/^./,function(c){return c.toUpperCase();}); }
+  function fmtVal(v){
+    if (v == null) return '—';
+    if (Array.isArray(v)) return v.length ? v.join(', ') : '—';
+    if (typeof v === 'object') { try { return JSON.stringify(v); } catch(e){ return '—'; } }
+    var t = String(v); return t.trim() ? t : '—';
+  }
+  var STU_HIDE_KEYS = { fullName:1, email:1, source:1, submittedAtLocal:1 };
+
+  function stuBodyInner(s){
+    var sid = String(s.studentId || '').trim();
+    var key = sid || String(s.enrollmentId || '');
+    var account = !sid ? '<span class="muted">—</span>'
+      : s.hasAccount ? '<span class="dot dot--ok">Registered</span>'
+      : '<span class="dot dot--warn">No account yet</span>';
+    var base = '';
+    base += '<dt>Email</dt><dd>' + esc(s.email || '—') + '</dd>';
+    base += '<dt>Account</dt><dd>' + account + '</dd>';
+    base += '<dt>Scope</dt><dd>' + esc(s.enrolledScope || '—') + '</dd>';
+    base += '<dt>Submitted</dt><dd>' + fmtDate(s.submittedAt) + '</dd>';
+    base += '<dt>Activated</dt><dd>' + fmtDate(s.activatedAt) + '</dd>';
+    base += '<dt>Registered</dt><dd>' + fmtDate(s.registeredAt) + '</dd>';
+    var fd = (s.formData && typeof s.formData === 'object') ? s.formData : {};
+    var extra = '';
+    Object.keys(fd).forEach(function(k){
+      if (STU_HIDE_KEYS[k]) return;
+      extra += '<dt>' + esc(prettyKey(k)) + '</dt><dd>' + esc(fmtVal(fd[k])) + '</dd>';
+    });
+    return '<div class="stu-body__acts">' +
+        '<button class="btn btn--secondary btn--sm" data-act="stu-edit" data-key="' + esc(key) + '">Edit details</button> ' +
+        '<button class="btn btn--quiet btn--sm" data-act="stu-voucher" data-key="' + esc(key) + '">Fee voucher</button>' +
+      '</div>' +
+      '<dl class="stu-dl">' + base + '</dl>' +
+      (extra ? '<div class="stu-sec">Enrollment form</div><dl class="stu-dl">' + extra + '</dl>' : '');
+  }
+
+  function stuCard(s){
+    var sid = String(s.studentId || '').trim();
+    var status = normalizeStatus(s.status);
+    var key = sid || String(s.enrollmentId || '');
+    var actions = '<button class="btn btn--secondary btn--sm" data-act="status" data-key="' + esc(key) + '">Change status</button>';
+    if (!s.hasAccount) actions += ' <button class="btn btn--quiet btn--sm" data-act="archive-one" data-key="' + esc(key) + '">Archive</button>';
+    return '<div class="stu-card" data-key="' + esc(key) + '">' +
+      '<div class="stu-head">' +
+        '<div class="stu-head__main">' +
+          '<div class="stu-head__name">' + esc(s.fullName || '—') + '</div>' +
+          '<div class="stu-head__sub">' + (sid ? esc(sid) : 'ID not issued') + '</div>' +
+        '</div>' +
+        '<div class="stu-head__right">' +
+          '<span class="badge ' + badgeFor(status) + '">' + esc(status) + '</span>' + actions +
+        '</div>' +
+        '<svg class="stu-caret" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M6 9l6 6 6-6"/></svg>' +
+      '</div>' +
+      '<div class="stu-body">' + stuBodyInner(s) + '</div></div>';
+  }
+
+  // ---- inline edit of a student's enrollment fields ----
+  function fmtPlain(v){
+    if (v == null) return '';
+    if (Array.isArray(v)) return v.join(', ');
+    if (typeof v === 'object') { try { return JSON.stringify(v); } catch(e){ return ''; } }
+    return String(v);
+  }
+  function findStudentByKey(key){
+    for (var i=0;i<results.length;i++){ var s=results[i];
+      if (String(s.studentId||'').trim()===key || String(s.enrollmentId||'')===key) return s; }
+    return null;
+  }
+  function findCardByKey(key){
+    var cards = qsa('.stu-card');
+    for (var i=0;i<cards.length;i++){ if (cards[i].getAttribute('data-key')===key) return cards[i]; }
+    return null;
+  }
+  // Enrollment-form config mirrored for admin editing (class 6-12 only).
+  var ENROLL = {
+    streams: { low:['Not applicable'], matric:['Biology group','Computer group'], inter:['Pre-Medical','Pre-Engineering','ICS'] },
+    subjects: { low:['Mathematics','Science','Geography','History','Computer'], matric:['Mathematics','Physics','Chemistry','Biology','Computer'], inter:['Mathematics','Physics','Chemistry','Biology','Computer'] },
+    plans: { Middle:[['Starter',5000],['Pro',12000],['Advanced',18000]], Matric:[['Starter',2000],['Pro',3500],['Advanced',4500]], Intermediate:[['Starter',2500],['Pro',4500],['Advanced',5500]] },
+    tuition: ['Online','Home Tuition']
+  };
+  function edBandKey(c){ c=Number(c); return c<=8?'low':(c<=10?'matric':'inter'); }
+  function edBandName(c){ c=Number(c); return c<=8?'Middle':(c<=10?'Matric':'Intermediate'); }
+
+  function edDynamicHtml(cls, cur){
+    cur = cur || {};
+    var k = edBandKey(cls), band = edBandName(cls);
+    var sOpts = '<option value="">\u2014 Select \u2014</option>' +
+      ENROLL.streams[k].map(function(x){ return '<option'+(x===cur.stream?' selected':'')+'>'+esc(x)+'</option>'; }).join('');
+    var streamHtml = '<label class="stu-edit__row"><span class="stu-edit__lbl">Stream</span><select class="input" data-field="stream">'+sOpts+'</select></label>';
+    var chosen = {}; (cur.subjects||[]).forEach(function(x){ chosen[String(x).trim().toLowerCase()]=1; });
+    var chips = ENROLL.subjects[k].map(function(sub){ return '<label class="ed-chip"><input type="checkbox" data-subject value="'+esc(sub)+'"'+(chosen[sub.toLowerCase()]?' checked':'')+'><span>'+esc(sub)+'</span></label>'; }).join('');
+    var subsHtml = '<div class="stu-edit__row"><span class="stu-edit__lbl">Subjects</span><div class="ed-chips">'+chips+'</div></div>';
+    var rows = ENROLL.plans[band];
+    var tierRow = rows.filter(function(p){ return p[0]===cur.plan; })[0];
+    var wantPrice = tierRow ? tierRow[1] : cur.price;
+    var planOpts = '<option value="">\u2014 Select \u2014</option>' +
+      rows.map(function(p){ return '<option value="'+p[0]+'"'+(p[0]===cur.plan?' selected':'')+'>'+p[0]+'</option>'; }).join('');
+    var priceOpts = rows.map(function(p){ return '<option value="'+p[1]+'"'+(String(p[1])===String(wantPrice)?' selected':'')+'>PKR '+Number(p[1]).toLocaleString()+' ('+p[0]+')</option>'; }).join('');
+    var planHtml = '<label class="stu-edit__row"><span class="stu-edit__lbl">Plan</span><select class="input" data-field="plan">'+planOpts+'</select></label>'+
+      '<label class="stu-edit__row"><span class="stu-edit__lbl">Plan price</span><select class="input" data-field="planPrice">'+priceOpts+'</select></label>';
+    return streamHtml + subsHtml + planHtml;
+  }
+  function edCurrentFromForm(ed){
+    function v(f){ var el=ed.querySelector('[data-field="'+f+'"]'); return el?el.value:''; }
+    var subs = Array.prototype.map.call(ed.querySelectorAll('[data-subject]:checked'), function(c){ return c.value; });
+    return { stream:v('stream'), plan:v('plan'), price:v('planPrice'), subjects:subs };
+  }
+
+  function stuEditForm(s, key){
+    var fd = (s.formData && typeof s.formData === 'object') ? s.formData : {};
+    function txt(field,label,val,type){
+      return '<label class="stu-edit__row"><span class="stu-edit__lbl">'+esc(label)+'</span>'+
+        '<input class="input" data-field="'+esc(field)+'" type="'+(type||'text')+'" value="'+esc(val==null?'':String(val))+'"></label>';
+    }
+    var cls = Number(fd.classLevel) || Number(s.classLevel) || 6;
+    if (cls < 6) cls = 6; if (cls > 12) cls = 12;
+    var subjects = Array.isArray(fd.subjects) ? fd.subjects
+      : (fd.subjects ? String(fd.subjects).split(',').map(function(x){return x.trim();}).filter(Boolean) : []);
+    var cur = { stream: fd.stream||'', subjects: subjects, plan: fd.plan||fd.planTier||'', price: fd.planPrice };
+
+    var classOpts = '';
+    for (var c=6;c<=12;c++){ classOpts += '<option value="'+c+'"'+(c===cls?' selected':'')+'>Class '+c+'</option>'; }
+    var tuitOpts = '<option value=""'+(!fd.tuitionMode?' selected':'')+'>\u2014 Select \u2014</option>' +
+      ENROLL.tuition.map(function(t){ return '<option'+(t===(fd.tuitionMode||'')?' selected':'')+'>'+esc(t)+'</option>'; }).join('');
+
+    var html = '<div class="stu-edit">' +
+      '<p class="stu-edit__hint">Same fields as the enrollment form. Changing Class updates Stream, Subjects and Plan for that level. Changing Subjects or Class updates which games this student can play.</p>';
+    html += txt('fullName','Full name', s.fullName || fd.fullName || '');
+    html += txt('email','Email', s.email || fd.email || '');
+    html += '<label class="stu-edit__row"><span class="stu-edit__lbl">Class</span><select class="input" data-field="classLevel">'+classOpts+'</select></label>';
+    html += '<label class="stu-edit__row"><span class="stu-edit__lbl">Tuition mode</span><select class="input" data-field="tuitionMode">'+tuitOpts+'</select></label>';
+    html += '<div class="ed-dynamic">'+edDynamicHtml(cls, cur)+'</div>';
+
+    var handled = {fullName:1,email:1,classLevel:1,tuitionMode:1,stream:1,subjects:1,plan:1,planTier:1,planPrice:1,classBand:1,source:1,submittedAtLocal:1};
+    ['fatherName','fatherOccupation','schoolName','address','otherSubject'].forEach(function(k){ html += txt(k, prettyKey(k), fmtPlain(fd[k])); handled[k]=1; });
+    Object.keys(fd).forEach(function(k){ if (handled[k]) return; html += txt(k, prettyKey(k), fmtPlain(fd[k])); });
+
+    html += '<div class="stu-edit__acts">'+
+      '<button class="btn btn--primary btn--sm" data-act="stu-save" data-key="'+esc(key)+'">Save changes</button> '+
+      '<button class="btn btn--quiet btn--sm" data-act="stu-cancel" data-key="'+esc(key)+'">Cancel</button>'+
+      '</div></div>';
+    return html;
+  }
+  function openStuEdit(key){
+    var s = findStudentByKey(key); if (!s) return;
+    var card = findCardByKey(key); if (!card) return;
+    card.classList.add('is-open');
+    var body = card.querySelector('.stu-body'); if (body) body.innerHTML = stuEditForm(s, key);
+  }
+  function cancelStuEdit(key){
+    var s = findStudentByKey(key), card = findCardByKey(key);
+    if (!s || !card) { renderResults(); return; }
+    var body = card.querySelector('.stu-body'); if (body) body.innerHTML = stuBodyInner(s);
+  }
+  function saveStuEdit(key, btn){
+    var card = findCardByKey(key); if (!card) return;
+    var ed = card.querySelector('.stu-edit'); if (!ed) return;
+    var patch = {};
+    Array.prototype.forEach.call(ed.querySelectorAll('[data-field]'), function(inp){ patch[inp.getAttribute('data-field')] = inp.value; });
+    patch.subjects = Array.prototype.map.call(ed.querySelectorAll('[data-subject]:checked'), function(c){ return c.value; });
+    if (patch.plan) patch.planTier = patch.plan;
+    if (patch.classLevel) patch.classBand = edBandName(patch.classLevel);
+    busy(btn, true);
+    authed('admin/updateEnrollment', { key: key, patch: patch })
+      .then(function(d){
+        toast('Changes saved.', 'ok');
+        var un = d && d.unmappedSubjects;
+        if (un && un.length) toast('Note: these subjects are not recognized for game unlocking: ' + un.join(', '), 'warn');
+        refresh();
+      })
+      .catch(function(e){ fail(e, 'Could not save changes.'); })
+      .then(function(){ busy(btn, false); });
+  }
+
+  // ---- fee voucher (printable) ----
+  var V_MONTHS = ['January','February','March','April','May','June','July','August','September','October','November','December'];
+  function vMon(i){ return V_MONTHS[i] || ''; }
+  function openVoucher(key){
+    var s = findStudentByKey(key); if (!s) return;
+    var fd = (s.formData && typeof s.formData === 'object') ? s.formData : {};
+    var sid = String(s.studentId||'').trim() || String(s.enrollmentId||'');
+    var now = new Date();
+    var billing = vMon(now.getMonth()) + ' ' + now.getFullYear();
+    var due = new Date(now.getTime() + 7*864e5);
+    var dueStr = due.getFullYear() + '-' + ('0'+(due.getMonth()+1)).slice(-2) + '-' + ('0'+due.getDate()).slice(-2);
+    var amount = (fd.planPrice!=null && fd.planPrice!=='') ? fd.planPrice : '';
+
+    var wrap = document.createElement('div');
+    wrap.className = 'vmodal'; wrap.id = 'vmodal';
+    wrap.innerHTML =
+      '<div class="vmodal__card">' +
+        '<div class="vmodal__bar no-print">' +
+          '<strong>Fee voucher</strong>' +
+          '<span><button class="btn btn--primary btn--sm" data-vact="print">Print / Save PDF</button> ' +
+          '<button class="btn btn--quiet btn--sm" data-vact="close">Close</button></span>' +
+        '</div>' +
+        '<div class="vform no-print">' +
+          '<label>Billing month<input class="input" id="v-month" value="' + esc(billing) + '"></label>' +
+          '<label>Due date<input class="input" id="v-due" type="date" value="' + esc(dueStr) + '"></label>' +
+          '<label>Amount (PKR)<input class="input" id="v-amt" type="number" value="' + esc(String(amount)) + '"></label>' +
+          '<label>Note (optional)<input class="input" id="v-note" value=""></label>' +
+        '</div>' +
+        '<div id="v-sheet"></div>' +
+      '</div>';
+    document.body.appendChild(wrap);
+
+    function fmtDue(iso){ if(!iso) return '—'; var d=new Date(iso); if(isNaN(d.getTime())) return esc(iso); return d.getDate()+' '+vMon(d.getMonth()).slice(0,3)+' '+d.getFullYear(); }
+    function render(){
+      var month = qs('#v-month').value, dueV = qs('#v-due').value, amt = qs('#v-amt').value, note = qs('#v-note').value;
+      var vno = 'WHA-FEE-' + (sid||'NA') + '-' + (now.getFullYear() + '' + ('0'+(now.getMonth()+1)).slice(-2));
+      var issued = now.getDate()+' '+vMon(now.getMonth()).slice(0,3)+' '+now.getFullYear();
+      var cls = (fd.classLevel!=null && fd.classLevel!=='') ? fd.classLevel : (s.classLevel||'');
+      var plan = fd.plan || fd.planTier || '';
+      var amtStr = (amt!=='' && amt!=null) ? Number(amt).toLocaleString() : '—';
+      function rowT(k,v){ return '<tr><td>'+esc(k)+'</td><td>'+esc((v==null||v==='')?'—':v)+'</td></tr>'; }
+      qs('#v-sheet').innerHTML =
+        '<div class="voucher-sheet">' +
+          '<div class="vh"><div class="vh__brand">W.H. Academy</div><div class="vh__title">Fee Voucher</div></div>' +
+          '<div class="vmeta">Voucher #: <b>'+esc(vno)+'</b> &middot; Issued: <b>'+esc(issued)+'</b></div>' +
+          '<table class="vtab">' +
+            rowT('Student ID', sid) +
+            rowT('Student Name', s.fullName||fd.fullName||'') +
+            rowT('Father Name', fd.fatherName||'') +
+            rowT('Class', cls ? ('Class '+cls) : '') +
+            rowT('Plan', plan) +
+            rowT('Billing Month', month) +
+            rowT('Due Date', fmtDue(dueV)) +
+          '</table>' +
+          '<div class="vamt">Amount Due: <b>PKR '+esc(amtStr)+'</b></div>' +
+          (note ? '<div class="vnote">'+esc(note)+'</div>' : '') +
+          '<div class="vfoot">Please pay on or before the due date. For queries call 0329-5215703. &mdash; W.H. Academy</div>' +
+        '</div>';
+    }
+    render();
+    ['v-month','v-due','v-amt','v-note'].forEach(function(id){ var el=qs('#'+id); if(el) el.addEventListener('input', render); });
+    wrap.addEventListener('click', function(e){
+      var b = e.target.closest ? e.target.closest('[data-vact]') : null;
+      if (b){ if (b.getAttribute('data-vact')==='print') window.print(); else closeVoucher(); return; }
+      if (e.target === wrap) closeVoucher();
+    });
+  }
+  function closeVoucher(){ var w = qs('#vmodal'); if (w && w.parentNode) w.parentNode.removeChild(w); }
 
   function renderResults(list, query) {
     var host = qs('#results');
-    results = Array.isArray(list) ? list : [];
+    if (Array.isArray(list)) { results = list; stuPage = 1; }
+    if (!Array.isArray(results)) results = [];
 
     if (!results.length) {
       host.innerHTML = '<div class="empty"><h2>No students matched</h2><p>' +
@@ -1501,35 +1890,140 @@ select.input { appearance: auto; background: var(--surface); }
       return;
     }
 
-    var rows = results.map(function (s) {
-      var sid = String(s.studentId || '').trim();
-      var status = normalizeStatus(s.status);
-      // Addressed by Student ID when it has one, by enrollment ID when it does
-      // not — a row awaiting activation has no Student ID yet.
-      var key = sid || String(s.enrollmentId || '');
+    var shown = filteredResults();
+    if (!shown.length) {
+      host.innerHTML = '<div class="empty"><h2>Nothing in this filter</h2><p>Try a different filter above.</p></div>';
+      return;
+    }
 
-      // Only meaningful once an ID exists: before that, "no account" is simply
-      // where everyone starts and says nothing worth flagging.
-      var account = !sid ? '<span class="muted">&mdash;</span>'
-        : s.hasAccount ? '<span class="dot dot--ok">Registered</span>'
-        : '<span class="dot dot--warn">No account yet</span>';
-
-      return '<tr>' +
-        '<td><div class="cell-name">' + esc(s.fullName || '—') + '</div>' +
-        '<div class="cell-sub">' + esc(s.email || '') + '</div></td>' +
-        '<td class="cell-id">' + (sid ? esc(sid) : '<span class="muted">not issued</span>') + '</td>' +
-        '<td>' + esc(s.enrolledScope || '—') + '</td>' +
-        '<td>' + account + '</td>' +
-        '<td><span class="badge ' + badgeFor(status) + '">' + esc(status) + '</span></td>' +
-        '<td class="cell-act"><button class="btn btn--secondary btn--sm" data-act="status" data-key="' +
-        esc(key) + '">Change status</button></td></tr>';
-    }).join('');
+    var total = Math.max(1, Math.ceil(shown.length / STU_PAGE_SIZE));
+    if (stuPage > total) stuPage = total;
+    if (stuPage < 1) stuPage = 1;
+    var start = (stuPage - 1) * STU_PAGE_SIZE;
+    var pageRows = shown.slice(start, start + STU_PAGE_SIZE);
 
     host.innerHTML =
-      '<div class="table-wrap"><table>' +
-      '<thead><tr><th>Student</th><th>Student ID</th><th>Scope</th><th>Account</th><th>Status</th><th></th></tr></thead>' +
-      '<tbody>' + rows + '</tbody></table></div>' +
-      '<p class="count">' + results.length + ' shown</p>';
+      '<div class="stu-list">' + pageRows.map(stuCard).join('') + '</div>' +
+      stuPagerHtml(total, start, pageRows.length, shown.length) +
+      '<p class="count">' + shown.length + ' total</p>';
+  }
+
+  function stuPagerHtml(total, start, shown, totalRows){
+    if (totalRows <= STU_PAGE_SIZE) return '';
+    var nums = [], win = 2;
+    for (var p = 1; p <= total; p++){
+      if (p === 1 || p === total || (p >= stuPage - win && p <= stuPage + win)) nums.push(p);
+      else if (nums[nums.length-1] !== '…') nums.push('…');
+    }
+    var numHtml = nums.map(function(p){
+      if (p === '…') return '<span class="ins-pager__gap">…</span>';
+      var cur = (p === stuPage) ? ' is-current' : '';
+      return '<button type="button" class="ins-pager__num' + cur + '" data-act="stu-page" data-page="' + p + '"' + (p===stuPage?' aria-current="page"':'') + '>' + p + '</button>';
+    }).join('');
+    return '<div class="ins-pager">' +
+      '<div class="ins-pager__info">Showing <strong>' + (start+1) + '–' + (start+shown) + '</strong> of <strong>' + totalRows + '</strong></div>' +
+      '<div class="ins-pager__btns">' +
+        '<button type="button" class="btn btn--quiet btn--sm" data-act="stu-page" data-page="' + (stuPage-1) + '"' + (stuPage<=1?' disabled':'') + '>Prev</button>' +
+        numHtml +
+        '<button type="button" class="btn btn--quiet btn--sm" data-act="stu-page" data-page="' + (stuPage+1) + '"' + (stuPage>=total?' disabled':'') + '>Next</button>' +
+      '</div></div>';
+  }
+
+  function gotoStuPage(p){
+    p = parseInt(p,10); if (isNaN(p)) return;
+    stuPage = p; renderResults();
+    var host = qs('#results'); try { host.scrollIntoView({behavior:'smooth',block:'start'}); } catch(e){}
+  }
+
+  function archiveOne(key){
+    if (!key) return;
+    authed('admin/archiveEnrollments', { keys: [key], reason: 'manual' })
+      .then(function(d){
+        var n = (d && d.archived) || 0;
+        if (n > 0) {
+          results = (results || []).filter(function(s){ return String(s.studentId||'').trim() !== key && String(s.enrollmentId||'') !== key; });
+          renderResults();
+          toast('Moved to Archived. You can restore it from the Archived tab.', 'ok');
+        } else {
+          toast('This record is registered and was not archived.', 'warn');
+        }
+      })
+      .catch(function(e){ fail(e, 'Could not archive this record.'); });
+  }
+
+  // ---- admin cleanup helpers (dates / filter / archive) ----
+  function fmtDate(iso) {
+    if (!iso) return '—';
+    var d = new Date(iso); if (isNaN(d.getTime())) return '—';
+    var mon = ['Jan','Feb','Mar','Apr','May','Jun','Jul','Aug','Sep','Oct','Nov','Dec'];
+    var hh = d.getHours(), ap = hh < 12 ? 'am' : 'pm', h12 = (hh % 12) || 12;
+    return d.getDate() + ' ' + mon[d.getMonth()] + ' ' + (d.getFullYear() % 100) + ', ' + h12 + ':' + ('0'+d.getMinutes()).slice(-2) + ap;
+  }
+  function currentFilter() { var f = qs('#f-filter'); return f ? f.value : 'all'; }
+  function filteredResults() {
+    var f = currentFilter();
+    return (results || []).filter(function (s) {
+      if (f === 'all') return true;
+      if (f === 'no-account') return !s.hasAccount;
+      return normalizeStatus(s.status).toLowerCase() === f;
+    });
+  }
+  function selectedKeys() {
+    return qsa('.row-cb').filter(function (c) { return c.checked; }).map(function (c) { return c.dataset.key; });
+  }
+  function updateBulkBar() {
+    var bar = qs('#bulk-bar'); if (!bar) return;
+    var n = selectedKeys().length;
+    bar.hidden = n === 0;
+    var c = qs('#bulk-count'); if (c) c.textContent = n + ' selected';
+  }
+  function archiveSelected() {
+    var keys = selectedKeys();
+    if (!keys.length) { toast('Select at least one row first.', 'warn'); return; }
+    if (!window.confirm('Move ' + keys.length + ' selected enrollment(s) to Archived?\n\nRegistered accounts are skipped. You can restore archived ones later.')) return;
+    authed('admin/archiveEnrollments', { keys: keys, reason: 'manual' })
+      .then(function (d) {
+        var msg = 'Archived ' + ((d && d.archived) || 0) + '.';
+        if (d && d.skipped && d.skipped.length) msg += ' Skipped ' + d.skipped.length + ' (registered/other).';
+        toast(msg, 'ok');
+        refresh();
+      })
+      .catch(function (e) { fail(e, 'Could not archive the selected rows.'); });
+  }
+  function loadArchived() {
+    authed('admin/listArchived', { limit: 300 })
+      .then(function (d) { renderArchived((d && d.archived) || []); })
+      .catch(function (e) { fail(e, 'Could not load archived records.'); });
+  }
+  function renderArchived(list) {
+    var host = qs('#archived-results'); if (!host) return;
+    if (!list.length) {
+      host.innerHTML = '<div class="empty"><h2>Nothing archived</h2><p>Deleted enrollments appear here. You can restore them, or delete them forever.</p></div>';
+      return;
+    }
+    var rows = list.map(function (a) {
+      return '<tr>' +
+        '<td><div class="cell-name">' + esc(a.fullName || '—') + '</div><div class="cell-sub">' + esc(a.email || '') + '</div></td>' +
+        '<td class="cell-id">' + esc(a.studentId || '—') + '</td>' +
+        '<td><span class="badge ' + badgeFor(normalizeStatus(a.status)) + '">' + esc(normalizeStatus(a.status)) + '</span></td>' +
+        '<td>' + esc(a.reason || '') + '</td>' +
+        '<td class="cell-dates"><div><b>Sub</b> ' + fmtDate(a.submittedAt) + '</div><div><b>Del</b> ' + fmtDate(a.deletedAt) + '</div><div class="cell-sub">by ' + esc(a.deletedBy || '') + '</div></td>' +
+        '<td class="cell-act"><button class="btn btn--secondary btn--sm" data-act="restore" data-arch="' + esc(a.archiveId) + '">Restore</button> ' +
+        '<button class="btn btn--danger btn--sm" data-act="purge" data-arch="' + esc(a.archiveId) + '">Delete forever</button></td></tr>';
+    }).join('');
+    host.innerHTML = '<div class="table-wrap"><table><thead><tr><th>Student</th><th>Student ID</th><th>Status</th><th>Why</th><th>Dates</th><th></th></tr></thead><tbody>' +
+      rows + '</tbody></table></div><p class="count">' + list.length + ' archived</p>';
+  }
+  function restoreArchive(id) {
+    authed('admin/restoreEnrollment', { archiveId: id })
+      .then(function () { toast('Restored.', 'ok'); loadArchived(); refresh(); })
+      .catch(function (e) { fail(e, 'Could not restore this record.'); });
+  }
+  function purgeArchive(id) {
+    if (!window.confirm('Delete this record permanently? This cannot be undone.')) return;
+    authed('admin/purgeArchived', { keys: [id] })
+      .then(function () { toast('Deleted permanently.', 'ok'); loadArchived(); })
+      .catch(function (e) { fail(e, 'Could not delete this record.'); });
   }
 
   // ---------------------------------------------------------------- actions
@@ -1805,6 +2299,7 @@ select.input { appearance: auto; background: var(--surface); }
     if (name === 'overview') loadStats();
     if (name === 'devices') loadDevices();
     if (name === 'papers') loadPapers();
+    if (name === 'archived') loadArchived();
   }
 
   function enterConsole(email) {
@@ -2330,7 +2825,13 @@ select.input { appearance: auto; background: var(--surface); }
     qs('#mf-insert').addEventListener('click', insertFromEditor);
     qs('#mf-cancel').addEventListener('click', closeMathEditor);
     modal.querySelector('[data-mf-close]').addEventListener('click', closeMathEditor);
-    document.addEventListener('keydown', function (e) { if (!modal.hidden && e.key === 'Escape') closeMathEditor(); });
+    document.addEventListener('change', function (e) {
+    var t = e.target;
+    if (!t) return;
+    if (t.id === 'f-filter') { stuPage = 1; renderResults(); return; }
+  });
+
+  document.addEventListener('keydown', function (e) { if (!modal.hidden && e.key === 'Escape') closeMathEditor(); });
   }
 
   function wirePapers() {
@@ -2614,6 +3115,7 @@ select.input { appearance: auto; background: var(--surface); }
   // TEACHERS — admin creates teacher accounts and assigns subjects.
   // The teacher's own grading happens on the separate teacher.html panel.
   // ===================================================================
+  var teacherList = [];
   function loadTeachers() {
     var host = qs('#tc-list');
     host.innerHTML = '<p class="muted">Loading…</p>';
@@ -2623,6 +3125,7 @@ select.input { appearance: auto; background: var(--surface); }
   }
 
   function renderTeachers(list) {
+    teacherList = list || [];
     var host = qs('#tc-list');
     if (!list.length) { host.innerHTML = '<div class="empty"><h2>No teachers yet</h2><p>Create one above.</p></div>'; return; }
     host.innerHTML = list.map(function (t) {
@@ -2631,34 +3134,108 @@ select.input { appearance: auto; background: var(--surface); }
       var subs = (t.subjects && t.subjects.length) ? t.subjects.join(', ') : '—';
       var isActive = (t.status === 'Active');
       var toggle = '<button class="btn btn--quiet btn--sm" data-act="tc-status" data-email="' + esc(t.email) + '" data-status="' + (isActive ? 'Suspended' : 'Active') + '">' + (isActive ? 'Suspend' : 'Activate') + '</button>';
+      var cls = (t.classes && t.classes.length) ? ('Class ' + t.classes.join(', ')) : 'All classes';
       return '<div class="pp-row">' +
         '<div class="pp-row__main"><div class="pp-row__title">' + esc(t.fullName || 'Teacher') +
           ' <span class="cell-sub">' + esc(t.email) + '</span></div>' +
-          '<div class="cell-sub">Subjects: ' + esc(subs) + '</div></div>' +
+          '<div class="cell-sub">Subjects: ' + esc(subs) + '</div>' +
+          '<div class="cell-sub">Classes: ' + esc(cls) + '</div></div>' +
         '<div class="pp-row__side">' + pill +
-          '<button class="btn btn--secondary btn--sm" data-act="tc-subjects" data-email="' + esc(t.email) + '" data-subjects="' + esc(subs === '—' ? '' : subs) + '">Edit subjects</button>' +
+          '<button class="btn btn--secondary btn--sm" data-act="tc-edit" data-email="' + esc(t.email) + '">Edit</button>' +
           toggle +
           '<button class="btn btn--quiet btn--sm" data-act="tc-resetpin" data-email="' + esc(t.email) + '">Reset PIN</button>' +
         '</div></div>';
     }).join('');
   }
 
+  function teacherPinError(pin){
+    pin = String(pin || '');
+    if (pin.length < 8 || pin.length > 16) return 'PIN must be 8–16 characters.';
+    if (!/[0-9]/.test(pin)) return 'PIN must include at least one number.';
+    if (!/[A-Za-z]/.test(pin)) return 'PIN must include at least one letter.';
+    return '';
+  }
+  function updateTcPinRules(){
+    var el = qs('#tc-pin'); var pin = el ? el.value : '';
+    var set = function(rule, ok){ var li = qs('#tc-pin-rules li[data-rule="' + rule + '"]'); if (li) li.classList.toggle('ok', !!ok); };
+    set('len', pin.length >= 8 && pin.length <= 16);
+    set('num', /[0-9]/.test(pin));
+    set('letter', /[A-Za-z]/.test(pin));
+  }
+
+  // ---- teacher subject/class chips ----
+  var TEACHER_SUBJECTS = ['Mathematics','English','Urdu','Science','Physics','Chemistry','Biology','Computer Science','Islamiat','Pakistan Studies','General Knowledge'];
+  function tcChipHtml(attr, val, label, checked){
+    return '<label class="ed-chip"><input type="checkbox" '+attr+' value="'+esc(val)+'"'+(checked?' checked':'')+'><span>'+esc(label)+'</span></label>';
+  }
+  function fillChips(host, items, attr, chosen){
+    if (!host) return;
+    var map = {}; (chosen||[]).forEach(function(x){ map[String(x).trim().toLowerCase()]=1; });
+    host.innerHTML = items.map(function(it){ return tcChipHtml(attr, it.v, it.l, map[String(it.v).toLowerCase()]); }).join('');
+  }
+  function subjectItems(){ return TEACHER_SUBJECTS.map(function(x){ return {v:x,l:x}; }); }
+  function classItems(){ var a=[]; for (var c=6;c<=12;c++) a.push({v:String(c),l:'Class '+c}); return a; }
+  function chipValues(host, attr){ if(!host) return []; return Array.prototype.map.call(host.querySelectorAll('['+attr+']:checked'), function(c){ return c.value; }); }
+  function fillTcChips(){
+    fillChips(qs('#tc-subject-chips'), subjectItems(), 'data-tsub', []);
+    fillChips(qs('#tc-class-chips'), classItems(), 'data-tcls', []);
+  }
+
+  function openTeacherEdit(email){
+    var t = null; for (var i=0;i<teacherList.length;i++){ if (String(teacherList[i].email)===String(email)) { t=teacherList[i]; break; } }
+    if (!t) return;
+    var wrap = document.createElement('div'); wrap.className='vmodal'; wrap.id='tmodal';
+    wrap.innerHTML =
+      '<div class="vmodal__card">' +
+        '<div class="vmodal__bar"><strong>Edit teacher &mdash; '+esc(t.fullName||t.email)+'</strong>' +
+          '<span><button class="btn btn--primary btn--sm" data-tact="save">Save</button> ' +
+          '<button class="btn btn--quiet btn--sm" data-tact="close">Close</button></span></div>' +
+        '<div class="field"><label class="field__label">Subjects</label><div class="ed-chips" id="te-subject-chips"></div></div>' +
+        '<div class="field"><label class="field__label">Classes <span class="muted">(empty = all classes)</span></label><div class="ed-chips" id="te-class-chips"></div></div>' +
+      '</div>';
+    document.body.appendChild(wrap);
+    fillChips(qs('#te-subject-chips'), subjectItems(), 'data-tsub', t.subjects||[]);
+    fillChips(qs('#te-class-chips'), classItems(), 'data-tcls', t.classes||[]);
+    wrap.addEventListener('click', function(e){
+      var b = e.target.closest ? e.target.closest('[data-tact]') : null;
+      if (b){ if (b.getAttribute('data-tact')==='save') saveTeacherEdit(email, b); else closeTeacherEdit(); return; }
+      if (e.target===wrap) closeTeacherEdit();
+    });
+  }
+  function closeTeacherEdit(){ var w=qs('#tmodal'); if (w&&w.parentNode) w.parentNode.removeChild(w); }
+  function saveTeacherEdit(email, btn){
+    var subs = chipValues(qs('#te-subject-chips'), 'data-tsub');
+    var cls = chipValues(qs('#te-class-chips'), 'data-tcls');
+    if (!subs.length){ toast('Pick at least one subject.', 'bad'); return; }
+    busy(btn, true);
+    authed('admin/updateTeacher', { email: email, subjects: subs.join(', '), classes: cls.join(', ') })
+      .then(function(){ toast('Teacher updated.', 'ok'); closeTeacherEdit(); loadTeachers(); })
+      .catch(function(e){ fail(e, 'Could not update the teacher.'); })
+      .then(function(){ busy(btn, false); });
+  }
+
   function createTeacher(button) {
+    var subs = chipValues(qs('#tc-subject-chips'), 'data-tsub');
+    var cls = chipValues(qs('#tc-class-chips'), 'data-tcls');
     var payload = {
       fullName: qs('#tc-name').value.trim(),
       email: qs('#tc-email').value.trim(),
       pin: qs('#tc-pin').value.trim(),
-      subjects: qs('#tc-subjects').value.trim()
+      subjects: subs.join(', '),
+      classes: cls.join(', ')
     };
-    if (!payload.fullName || !payload.email || !payload.pin || !payload.subjects) {
-      toast('Fill in name, email, PIN and at least one subject.', 'bad');
+    if (!payload.fullName || !payload.email || !payload.pin || !subs.length) {
+      toast('Fill in name, email, PIN and pick at least one subject.', 'bad');
       return;
     }
+    var pe = teacherPinError(payload.pin);
+    if (pe) { toast(pe, 'bad'); return; }
     busy(button, true);
     authed('admin/createTeacher', { teacher: payload })
       .then(function () {
         toast('Teacher created.', 'ok');
-        ['#tc-name', '#tc-email', '#tc-pin', '#tc-subjects'].forEach(function (s) { qs(s).value = ''; });
+        qs('#tc-name').value = ''; qs('#tc-email').value = ''; qs('#tc-pin').value = '';
+        fillTcChips(); updateTcPinRules();
         loadTeachers();
       })
       .catch(function (e) { fail(e, 'Could not create the teacher.'); })
@@ -2671,13 +3248,14 @@ select.input { appearance: auto; background: var(--surface); }
     var act = t.dataset.act;
     var email = t.getAttribute('data-email');
     if (act === 'gr-refresh-teachers') return loadTeachers();
-    if (act === 'tc-subjects') {
-      var next = window.prompt('Subjects for ' + email + ' (comma-separated):', t.getAttribute('data-subjects') || '');
-      if (next == null) return;
-      return authed('admin/setTeacherSubjects', { email: email, subjects: next })
-        .then(function () { toast('Subjects updated.', 'ok'); loadTeachers(); })
-        .catch(function (err) { fail(err, 'Could not update subjects.'); });
+    if (act === 'tc-eye') {
+      var pinEl = qs('#tc-pin'); if (!pinEl) return;
+      var showing = pinEl.type === 'text';
+      pinEl.type = showing ? 'password' : 'text';
+      t.textContent = showing ? '👁' : '🙈';
+      return;
     }
+    if (act === 'tc-edit') return openTeacherEdit(email);
     if (act === 'tc-status') {
       var status = t.getAttribute('data-status');
       return authed('admin/setTeacherStatus', { email: email, status: status })
@@ -2685,8 +3263,10 @@ select.input { appearance: auto; background: var(--surface); }
         .catch(function (err) { fail(err, 'Could not change status.'); });
     }
     if (act === 'tc-resetpin') {
-      var pin = window.prompt('New PIN for ' + email + ' (4–8 digits):', '');
+      var pin = window.prompt('New PIN for ' + email + ' (8–16, letters & numbers):', '');
       if (pin == null) return;
+      var rpe = teacherPinError(pin.trim());
+      if (rpe) { toast(rpe, 'bad'); return; }
       return authed('admin/resetTeacherPin', { email: email, newPin: pin.trim() })
         .then(function () { toast('PIN reset. Share the new PIN with the teacher.', 'ok'); })
         .catch(function (err) { fail(err, 'Could not reset the PIN.'); });
@@ -2699,6 +3279,9 @@ select.input { appearance: auto; background: var(--surface); }
     panel.addEventListener('click', onTeachersClick);
     var create = qs('#tc-create');
     if (create) create.addEventListener('click', function (e) { createTeacher(e.currentTarget); });
+    var pinInput = qs('#tc-pin');
+    if (pinInput) pinInput.addEventListener('input', updateTcPinRules);
+    fillTcChips();
   }
 
   // ==========================================================================
@@ -2708,42 +3291,77 @@ select.input { appearance: auto; background: var(--surface); }
   // Lazy-rendered so a long feedback list never blocks the panel: everything
   // is fetched once, then drawn in batches as the admin scrolls (IntersectionObserver).
   var insList = [];
-  var insShown = 0;
-  var insObserver = null;
-  var INS_BATCH = 12;
+  var insPage = 1;
+  var INS_PAGE_SIZE = 10;   // classic 10-per-page pager (Prev / 1..N / Next)
 
   function loadInsights() {
     var filter = qs('#ins-filter');
     var status = filter ? filter.value : '';
     var host = qs('#ins-list');
     host.innerHTML = '<p class="muted">Loading…</p>';
-    if (insObserver) { insObserver.disconnect(); insObserver = null; }
     authed('insights/adminList', { status: status })
       .then(function (data) {
         insList = (data && data.insights) || [];
-        insShown = 0;
+        // Guarantee newest-first regardless of backend order (createdAt is ISO).
+        insList.sort(function (a, b) { return String(b.createdAt || '').localeCompare(String(a.createdAt || '')); });
+        insPage = 1;
         host.innerHTML = '';
+        var pager0 = qs('#ins-pager'); if (pager0) { pager0.hidden = true; pager0.innerHTML = ''; }
         if (!insList.length) { host.innerHTML = '<div class="empty"><h2>Nothing here</h2><p>No feedback for this filter yet.</p></div>'; return; }
-        renderMoreInsights();
+        renderInsightsPage();
       })
       .catch(function (e) { host.innerHTML = ''; fail(e, 'Could not load insights.'); });
   }
 
-  function renderMoreInsights() {
+  function insTotalPages() { return Math.max(1, Math.ceil(insList.length / INS_PAGE_SIZE)); }
+
+  function renderInsightsPage() {
     var host = qs('#ins-list');
-    var old = qs('#ins-sentinel'); if (old) old.remove();
-    var slice = insList.slice(insShown, insShown + INS_BATCH);
-    insShown += slice.length;
+    var total = insTotalPages();
+    if (insPage > total) insPage = total;
+    if (insPage < 1) insPage = 1;
+    var start = (insPage - 1) * INS_PAGE_SIZE;
+    var slice = insList.slice(start, start + INS_PAGE_SIZE);
+    host.innerHTML = '';
     slice.forEach(function (it) { host.insertAdjacentHTML('beforeend', insCard(it)); });
-    if (insShown < insList.length) {
-      host.insertAdjacentHTML('beforeend', '<div id="ins-sentinel" style="height:1px;"></div>');
-      var sentinel = qs('#ins-sentinel');
-      if (insObserver) insObserver.disconnect();
-      insObserver = new IntersectionObserver(function (entries) {
-        if (entries[0].isIntersecting) { insObserver.disconnect(); renderMoreInsights(); }
-      }, { rootMargin: '300px' });
-      insObserver.observe(sentinel);
+    renderInsPager(total, start, slice.length);
+    try { host.scrollIntoView({ behavior: 'smooth', block: 'start' }); } catch (e) {}
+  }
+
+  function renderInsPager(total, start, shown) {
+    var pager = qs('#ins-pager');
+    if (!pager) return;
+    if (insList.length <= INS_PAGE_SIZE) { pager.hidden = true; pager.innerHTML = ''; return; }
+    pager.hidden = false;
+
+    // Numbered window: always show first + last, plus a few around the current.
+    var nums = [], win = 2;
+    for (var p = 1; p <= total; p++) {
+      if (p === 1 || p === total || (p >= insPage - win && p <= insPage + win)) nums.push(p);
+      else if (nums[nums.length - 1] !== '…') nums.push('…');
     }
+    var numHtml = nums.map(function (p) {
+      if (p === '…') return '<span class="ins-pager__gap">…</span>';
+      var cur = (p === insPage) ? ' is-current' : '';
+      return '<button type="button" class="ins-pager__num' + cur + '" data-act="ins-page" data-page="' + p + '"' +
+        (p === insPage ? ' aria-current="page"' : '') + '>' + p + '</button>';
+    }).join('');
+
+    var from = start + 1, to = start + shown;
+    pager.innerHTML =
+      '<div class="ins-pager__info">Showing <strong>' + from + '–' + to + '</strong> of <strong>' + insList.length + '</strong></div>' +
+      '<div class="ins-pager__btns">' +
+        '<button type="button" class="btn btn--quiet btn--sm" data-act="ins-page" data-page="' + (insPage - 1) + '"' + (insPage <= 1 ? ' disabled' : '') + '>Prev</button>' +
+        numHtml +
+        '<button type="button" class="btn btn--quiet btn--sm" data-act="ins-page" data-page="' + (insPage + 1) + '"' + (insPage >= total ? ' disabled' : '') + '>Next</button>' +
+      '</div>';
+  }
+
+  function gotoInsPage(p) {
+    p = parseInt(p, 10);
+    if (isNaN(p)) return;
+    insPage = p;
+    renderInsightsPage();
   }
 
   function insBlock(title, text) {
@@ -2939,6 +3557,7 @@ select.input { appearance: auto; background: var(--surface); }
       if (act.dataset.act === 'ins-edit') return openInsEdit(act.dataset.id);
       if (act.dataset.act === 'ins-edit-save') return saveInsEdit(act.dataset.id, act);
       if (act.dataset.act === 'ins-edit-cancel') return loadInsights();
+      if (act.dataset.act === 'ins-page') return gotoInsPage(act.dataset.page);
       return;
     }
     var tog = e.target.closest ? e.target.closest('[data-toggle]') : null;
@@ -3219,8 +3838,36 @@ select.input { appearance: auto; background: var(--surface); }
 
   // Row buttons are rebuilt on every search, so listen once on the container.
   qs('#results').addEventListener('click', function (e) {
-    var b = e.target.closest('[data-act="status"]');
-    if (b) openDialog(b.dataset.key);
+    var b = e.target.closest('[data-act]');
+    if (b) {
+      var a = b.dataset.act;
+      if (a === 'status') return openDialog(b.dataset.key);
+      if (a === 'archive-one') return archiveOne(b.dataset.key);
+      if (a === 'stu-page') return gotoStuPage(b.dataset.page);
+      if (a === 'stu-edit') return openStuEdit(b.dataset.key);
+      if (a === 'stu-save') return saveStuEdit(b.dataset.key, b);
+      if (a === 'stu-cancel') return cancelStuEdit(b.dataset.key);
+      if (a === 'stu-voucher') return openVoucher(b.dataset.key);
+      return;
+    }
+    var head = e.target.closest('.stu-head');
+    if (head) { var c = head.closest('.stu-card'); if (c) c.classList.toggle('is-open'); }
+  });
+
+  qs('#results').addEventListener('change', function (e) {
+    var t = e.target; if (!t || !t.closest) return;
+    var ed = t.closest('.stu-edit'); if (!ed) return;
+    var f = t.getAttribute('data-field');
+    if (f === 'classLevel') {
+      var dyn = ed.querySelector('.ed-dynamic');
+      if (dyn) dyn.innerHTML = edDynamicHtml(t.value, edCurrentFromForm(ed));
+    } else if (f === 'plan') {
+      var clsSel = ed.querySelector('[data-field="classLevel"]');
+      var band = edBandName(clsSel ? clsSel.value : 6);
+      var row = ENROLL.plans[band].filter(function (p) { return p[0] === t.value; })[0];
+      var ps = ed.querySelector('[data-field="planPrice"]');
+      if (row && ps) ps.value = String(row[1]);
+    }
   });
 
   document.addEventListener('click', function (e) {
@@ -3239,6 +3886,9 @@ select.input { appearance: auto; background: var(--surface); }
     if (t.dataset.act === 'close') closeDialog();
     if (t.dataset.act === 'refresh') loadStats();
     if (t.dataset.act === 'refresh-papers') loadPapers();
+    if (t.dataset.act === 'restore') restoreArchive(t.dataset.arch);
+    if (t.dataset.act === 'purge') purgeArchive(t.dataset.arch);
+    if (t.dataset.act === 'refresh-archived') loadArchived();
     if (t.dataset.view) {
       showView(t.dataset.view);
       if (t.dataset.view === 'grading') loadGrading();
@@ -3249,6 +3899,7 @@ select.input { appearance: auto; background: var(--surface); }
   });
 
   document.addEventListener('keydown', function (e) {
+    if (e.key === 'Escape') { var _tm = qs('#tmodal'); if (_tm) { closeTeacherEdit(); return; } var _vm = qs('#vmodal'); if (_vm) { closeVoucher(); return; } }
     if (e.key === 'Escape' && !qs('#dialog').hidden) closeDialog();
   });
 
@@ -3281,5 +3932,7 @@ select.input { appearance: auto; background: var(--surface); }
       </div>
     </div>
   </div>
+<script src="assets/js/admin-rechecking.js"></script>
+<script src="assets/js/staff-shell.js"></script>
 </body>
 </html>
