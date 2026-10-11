@@ -1892,7 +1892,13 @@ window.WHAAdminRecheckBridge = {
 
   function renderResults(list, query) {
     var host = qs('#results');
-    if (Array.isArray(list)) { results = list; stuPage = 1; }
+    if (Array.isArray(list)) {
+      // Newest enrolments first (submittedAt is an ISO string → desc sort).
+      results = list.slice().sort(function(a, b){
+        return String((b && b.submittedAt) || '').localeCompare(String((a && a.submittedAt) || ''));
+      });
+      stuPage = 1;
+    }
     if (!Array.isArray(results)) results = [];
 
     if (!results.length) {
