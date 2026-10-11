@@ -1721,14 +1721,29 @@ window.WHAAdminRecheckBridge = {
     return null;
   }
   // Enrollment-form config mirrored for admin editing (class 6-12 only).
+  // ---- Enrollment config (mirrors enroll.html + the student lock form). ----
+  // EDIT HERE to add/change streams, subjects or plans. For classes 9-12 the
+  // subject list depends on the STREAM (Federal board groups). Middle (6-8) has
+  // one fixed list and no stream.
   var ENROLL = {
     streams: { low:['Not applicable'], matric:['Biology group','Computer group'], inter:['Pre-Medical','Pre-Engineering','ICS'] },
-    subjects: { low:['Mathematics','Science','Geography','History','Computer'], matric:['Mathematics','Physics','Chemistry','Biology','Computer'], inter:['Mathematics','Physics','Chemistry','Biology','Computer'] },
+    subjectsMiddle: ['Mathematics','Science','Geography','History','Computer'],
+    subjectsByStream: {
+      'Biology group':   ['Mathematics','Physics','Chemistry','Biology'],
+      'Computer group':  ['Mathematics','Physics','Chemistry','Computer'],
+      'Pre-Medical':     ['Physics','Chemistry','Biology'],
+      'Pre-Engineering': ['Physics','Chemistry','Mathematics'],
+      'ICS':             ['Physics','Mathematics','Computer']
+    },
     plans: { Middle:[['Starter',5000],['Pro',12000],['Advanced',18000]], Matric:[['Starter',2000],['Pro',3500],['Advanced',4500]], Intermediate:[['Starter',2500],['Pro',4500],['Advanced',5500]] },
     tuition: ['Online','Home Tuition']
   };
   function edBandKey(c){ c=Number(c); return c<=8?'low':(c<=10?'matric':'inter'); }
   function edBandName(c){ c=Number(c); return c<=8?'Middle':(c<=10?'Matric':'Intermediate'); }
+  function edSubjectsFor(cls, stream){
+    if (Number(cls) <= 8) return ENROLL.subjectsMiddle;
+    return ENROLL.subjectsByStream[String(stream||'')] || [];
+  }
 
   function edDynamicHtml(cls, cur){
     cur = cur || {};
@@ -1737,7 +1752,10 @@ window.WHAAdminRecheckBridge = {
       ENROLL.streams[k].map(function(x){ return '<option'+(x===cur.stream?' selected':'')+'>'+esc(x)+'</option>'; }).join('');
     var streamHtml = '<label class="stu-edit__row"><span class="stu-edit__lbl">Stream</span><select class="input" data-field="stream">'+sOpts+'</select></label>';
     var chosen = {}; (cur.subjects||[]).forEach(function(x){ chosen[String(x).trim().toLowerCase()]=1; });
-    var chips = ENROLL.subjects[k].map(function(sub){ return '<label class="ed-chip"><input type="checkbox" data-subject value="'+esc(sub)+'"'+(chosen[sub.toLowerCase()]?' checked':'')+'><span>'+esc(sub)+'</span></label>'; }).join('');
+    var subjList = edSubjectsFor(cls, cur.stream);
+    var chips = subjList.length
+      ? subjList.map(function(sub){ return '<label class="ed-chip"><input type="checkbox" data-subject value="'+esc(sub)+'"'+(chosen[sub.toLowerCase()]?' checked':'')+'><span>'+esc(sub)+'</span></label>'; }).join('')
+      : '<span class="muted" style="font-size:.85rem;">Choose a stream first to see its subjects.</span>';
     var subsHtml = '<div class="stu-edit__row"><span class="stu-edit__lbl">Subjects</span><div class="ed-chips">'+chips+'</div></div>';
     var rows = ENROLL.plans[band];
     var tierRow = rows.filter(function(p){ return p[0]===cur.plan; })[0];
@@ -1809,6 +1827,13 @@ window.WHAAdminRecheckBridge = {
     patch.subjects = Array.prototype.map.call(ed.querySelectorAll('[data-subject]:checked'), function(c){ return c.value; });
     if (patch.plan) patch.planTier = patch.plan;
     if (patch.classLevel) patch.classBand = edBandName(patch.classLevel);
+    // Don't save a half-filled form — same fields the enrollment/lock form requires.
+    var clsN = Number(patch.classLevel) || 0;
+    if (!clsN) { toast('Please choose a class.', 'warn'); return; }
+    if (clsN >= 9 && !String(patch.stream || '').trim()) { toast('Please choose a stream.', 'warn'); return; }
+    if (!patch.subjects || !patch.subjects.length) { toast('Please select at least one subject.', 'warn'); return; }
+    if (!String(patch.plan || '').trim()) { toast('Please choose a plan.', 'warn'); return; }
+    if (!String(patch.tuitionMode || '').trim()) { toast('Please choose a tuition mode.', 'warn'); return; }
     busy(btn, true);
     authed('admin/updateEnrollment', { key: key, patch: patch })
       .then(function(d){
@@ -4025,6 +4050,10 @@ window.WHAAdminRecheckBridge = {
     if (f === 'classLevel') {
       var dyn = ed.querySelector('.ed-dynamic');
       if (dyn) dyn.innerHTML = edDynamicHtml(t.value, edCurrentFromForm(ed));
+    } else if (f === 'stream') {
+      var dyn2 = ed.querySelector('.ed-dynamic');
+      var clsEl = ed.querySelector('[data-field="classLevel"]');
+      if (dyn2) dyn2.innerHTML = edDynamicHtml(clsEl ? clsEl.value : 6, edCurrentFromForm(ed));
     } else if (f === 'plan') {
       var clsSel = ed.querySelector('[data-field="classLevel"]');
       var band = edBandName(clsSel ? clsSel.value : 6);
