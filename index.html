@@ -953,6 +953,7 @@ select.input { appearance: auto; background: var(--surface); }
         <button class="btn btn--secondary btn--sm" type="button" id="promo-select-btn">Select students</button>
         <button class="btn btn--secondary btn--sm" type="button" id="promo-promote-btn" style="display:none;">Promote selected</button>
         <button class="btn btn--quiet btn--sm" type="button" id="promo-unpromote-btn" style="display:none;">Do not promote (undo)</button>
+        <button class="btn btn--quiet btn--sm" type="button" id="promo-demote-btn" style="display:none;">Move back a class</button>
         <button class="btn btn--quiet btn--sm" type="button" id="promo-review-btn">Review promotion requests</button>
         <span class="muted" id="promo-sel-count" style="align-self:center;font-size:.82rem;"></span>
       </div>
@@ -3912,9 +3913,10 @@ window.WHAAdminRecheckBridge = {
   }
   function setPromoSelMode(on){
     var res = qs('#results'); if (res) res.classList.toggle('wha-selmode', on);
-    var pp = qs('#promo-promote-btn'), up = qs('#promo-unpromote-btn'), sb = qs('#promo-select-btn');
+    var pp = qs('#promo-promote-btn'), up = qs('#promo-unpromote-btn'), dm = qs('#promo-demote-btn'), sb = qs('#promo-select-btn');
     if (pp) pp.style.display = on ? '' : 'none';
     if (up) up.style.display = on ? '' : 'none';
+    if (dm) dm.style.display = on ? '' : 'none';
     if (sb) sb.textContent = on ? 'Done selecting' : 'Select students';
     if (!on) clearPromoChecks();
   }
@@ -3957,6 +3959,20 @@ window.WHAAdminRecheckBridge = {
         clearPromoChecks();
         promoRefreshViews();
       }).catch(function (err) { busy(upb, false); fail(err); });
+    });
+    var dbb = qs('#promo-demote-btn');
+    if (dbb) dbb.addEventListener('click', function () {
+      var ids = promoSelectedIds();
+      if (!ids.length) return toast('Tick one or more students on their cards first.');
+      if (!confirm('Move ' + ids.length + ' student(s) back one class (undo their last promotion)? Only applies to students who were actually promoted.')) return;
+      busy(dbb, true);
+      authed('admin/demoteStudents', { studentIds: ids }).then(function (r) {
+        busy(dbb, false);
+        var okN = (r.demoted || []).length, skN = (r.skipped || []).length;
+        toast('Moved back ' + okN + (skN ? (', skipped ' + skN) : '') + '.');
+        if (skN) console.log('Demote skipped:', r.skipped);
+        clearPromoChecks(); promoRefreshViews();
+      }).catch(function (err) { busy(dbb, false); fail(err); });
     });
     var rb = qs('#promo-review-btn');
     if (rb) rb.addEventListener('click', loadPromotions);
