@@ -3887,6 +3887,10 @@ window.WHAAdminRecheckBridge = {
     if (sb) sb.textContent = on ? 'Done selecting' : 'Select students';
     if (!on) clearPromoChecks();
   }
+  function promoRefreshViews(){
+    try { if (typeof refresh === 'function') refresh(); } catch (e) {}
+    var pp = qs('#promo-panel'); if (pp && pp.innerHTML) loadPromotions();
+  }
   qs('#results').addEventListener('change', function (e) {
     if (e.target && e.target.classList && e.target.classList.contains('promo-check')) promoUpdateCount();
   });
@@ -3905,6 +3909,7 @@ window.WHAAdminRecheckBridge = {
         toast('Promoted ' + okN + (skN ? (', skipped ' + skN) : '') + '.');
         if (skN) console.log('Promote skipped:', r.skipped);
         clearPromoChecks();
+        promoRefreshViews();
       }).catch(function (err) { busy(pb, false); fail(err); });
     });
     var upb = qs('#promo-unpromote-btn');
@@ -3918,8 +3923,8 @@ window.WHAAdminRecheckBridge = {
         var okN = (r.cancelled || []).length, skN = (r.skipped || []).length;
         toast('Undone ' + okN + (skN ? (', skipped ' + skN) : '') + '.');
         if (skN) console.log('Undo skipped:', r.skipped);
-        var pp = qs('#promo-panel'); if (pp && pp.innerHTML) loadPromotions();
         clearPromoChecks();
+        promoRefreshViews();
       }).catch(function (err) { busy(upb, false); fail(err); });
     });
     var rb = qs('#promo-review-btn');
@@ -3991,8 +3996,8 @@ window.WHAAdminRecheckBridge = {
     authed('admin/approvePromotions', { studentIds: ids }).then(function (r) {
       var okN = (r.approved || []).length, skN = (r.skipped || []).length;
       toast(okN ? 'Approved — new class opened.' : ('Skipped ' + skN + '.'));
-      if (skN) console.log('Approve skipped:', r.skipped);
-      loadPromotions();
+      if (skN) console.log("Approve skipped:", r.skipped);
+      promoRefreshViews();
     }).catch(function (err) { if (btn) busy(btn, false); fail(err); });
   }
   function promoDoRemove(ids, btn){
@@ -4002,8 +4007,8 @@ window.WHAAdminRecheckBridge = {
     authed('admin/cancelPromotion', { studentIds: ids }).then(function (r) {
       var okN = (r.cancelled || []).length, skN = (r.skipped || []).length;
       toast(okN ? 'Removed from promotion.' : ('Skipped ' + skN + '.'));
-      if (skN) console.log('Remove skipped:', r.skipped);
-      loadPromotions();
+      if (skN) console.log("Remove skipped:", r.skipped);
+      promoRefreshViews();
     }).catch(function (err) { if (btn) busy(btn, false); fail(err); });
   }
 
