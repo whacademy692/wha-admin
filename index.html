@@ -948,6 +948,13 @@ select.input { appearance: auto; background: var(--surface); }
         </select>
       </div>
 
+      <div class="stu-toolbar" style="gap:8px;flex-wrap:wrap;">
+        <button class="btn btn--secondary btn--sm" type="button" id="promo-promote-btn">Promote selected</button>
+        <button class="btn btn--quiet btn--sm" type="button" id="promo-review-btn">Review promotion requests</button>
+        <span class="muted" id="promo-sel-count" style="align-self:center;font-size:.82rem;"></span>
+      </div>
+      <div id="promo-panel" style="margin:10px 0;"></div>
+
       <div id="results" aria-live="polite"></div>
     </section>
 
@@ -1490,6 +1497,7 @@ select.input { appearance: auto; background: var(--surface); }
   var RETRYABLE_OPS = {
     'insights/adminList': 1, 'insights/approved': 1,
     'admin/statistics': 1, 'admin/searchStudents': 1, 'admin/listTeachers': 1, 'admin/devices': 1,
+    'admin/listPromotions': 1,
     'bossbattle/admin/listPapers': 1, 'bossbattle/admin/listSubmissions': 1,
     'bossbattle/admin/getPaperForEdit': 1, 'bossbattle/admin/submissionForGrading': 1
   };
@@ -1679,6 +1687,7 @@ window.WHAAdminRecheckBridge = {
     if (!s.hasAccount) actions += ' <button class="btn btn--quiet btn--sm" data-act="archive-one" data-key="' + esc(key) + '">Archive</button>';
     return '<div class="stu-card" data-key="' + esc(key) + '">' +
       '<div class="stu-head">' +
+        (sid && s.hasAccount ? '<input type="checkbox" class="promo-check" data-act="promo-check" data-key="' + esc(sid) + '" title="Select for promotion" style="flex:0 0 auto;width:18px;height:18px;cursor:pointer;">' : '') +
         '<div class="stu-head__main">' +
           '<div class="stu-head__name">' + esc(s.fullName || '—') + '</div>' +
           '<div class="stu-head__sub">' + (sid ? esc(sid) : 'ID not issued') + '</div>' +
@@ -3853,6 +3862,87 @@ window.WHAAdminRecheckBridge = {
     var head = e.target.closest('.stu-head');
     if (head) { var c = head.closest('.stu-card'); if (c) c.classList.toggle('is-open'); }
   });
+
+  // ---- Yearly promotion (4b): select on cards -> Promote; review -> Approve ----
+  function promoSelectedIds(){
+    return Array.prototype.slice.call(document.querySelectorAll('#results .promo-check:checked'))
+      .map(function(c){ return c.getAttribute('data-key'); }).filter(Boolean);
+  }
+  function promoUpdateCount(){
+    var n = promoSelectedIds().length;
+    var el = qs('#promo-sel-count'); if (el) el.textContent = n ? (n + ' selected') : '';
+  }
+  qs('#results').addEventListener('change', function (e) {
+    if (e.target && e.target.classList && e.target.classList.contains('promo-check')) promoUpdateCount();
+  });
+  (function(){
+    var pb = qs('#promo-promote-btn');
+    if (pb) pb.addEventListener('click', function () {
+      var ids = promoSelectedIds();
+      if (!ids.length) return toast('Tick one or more registered students first.');
+      if (!confirm('Promote ' + ids.length + ' student(s) to the next class? Each will be asked to fill a new-class form at next login.')) return;
+      busy(pb, true);
+      authed('admin/promoteStudents', { studentIds: ids }).then(function (r) {
+        busy(pb, false);
+        var okN = (r.promoted || []).length, skN = (r.skipped || []).length;
+        toast('Promoted ' + okN + (skN ? (', skipped ' + skN) : '') + '.');
+        if (skN) console.log('Promote skipped:', r.skipped);
+      }).catch(function (err) { busy(pb, false); fail(err); });
+    });
+    var rb = qs('#promo-review-btn');
+    if (rb) rb.addEventListener('click', loadPromotions);
+  })();
+
+  function loadPromotions(){
+    var panel = qs('#promo-panel'); if (!panel) return;
+    panel.innerHTML = '<p class="muted">Loading…</p>';
+    authed('admin/listPromotions', {}).then(function (r) { renderPromotions(r || {}); })
+      .catch(function (err) { panel.innerHTML = ''; fail(err); });
+  }
+  function promoDraftLine(d){
+    if (!d) return '';
+    var subs = Array.isArray(d.subjects) ? d.subjects.join(', ') : '';
+    return 'Class ' + esc(String(d.targetClass || '')) + ' · ' + esc(d.stream || '') +
+      ' · ' + esc(d.planTier || '') + (d.planPrice != null ? (' (PKR ' + esc(String(d.planPrice)) + ')') : '') +
+      (subs ? (' · ' + esc(subs)) : '');
+  }
+  function renderPromotions(r){
+    var panel = qs('#promo-panel');
+    var wait = r.awaitingStudent || [], appr = r.awaitingApproval || [];
+    var html = '<div class="stu-sec">Awaiting your approval (' + appr.length + ')</div>';
+    if (!appr.length) html += '<p class="muted">No requests awaiting approval.</p>';
+    else {
+      html += appr.map(function (s) {
+        return '<label style="display:flex;gap:10px;align-items:flex-start;padding:8px 0;border-bottom:1px solid var(--line,#e5e7eb);">' +
+          '<input type="checkbox" class="promo-appr" data-key="' + esc(s.studentId) + '" style="margin-top:3px;">' +
+          '<span><strong>' + esc(s.fullName || '—') + '</strong> <span class="muted" style="font-family:ui-monospace,monospace;font-size:.8rem;">' + esc(s.studentId) + '</span>' +
+          '<br><span class="muted" style="font-size:.85rem;">' + promoDraftLine(s.draft) + '</span></span>' +
+        '</label>';
+      }).join('');
+      html += '<div style="margin-top:10px;"><button class="btn btn--primary btn--sm" type="button" id="promo-approve-btn">Approve selected</button></div>';
+    }
+    html += '<div class="stu-sec" style="margin-top:16px;">Awaiting student form (' + wait.length + ')</div>';
+    if (!wait.length) html += '<p class="muted">None.</p>';
+    else html += wait.map(function (s) {
+      return '<div class="muted" style="padding:6px 0;font-size:.85rem;"><strong>' + esc(s.fullName || '—') + '</strong> ' + esc(s.studentId) + ' → Class ' + esc(String(s.targetClass || '')) + ' (waiting for student)</div>';
+    }).join('');
+    panel.innerHTML = html;
+    var ab = qs('#promo-approve-btn');
+    if (ab) ab.addEventListener('click', function () {
+      var ids = Array.prototype.slice.call(panel.querySelectorAll('.promo-appr:checked'))
+        .map(function(c){ return c.getAttribute('data-key'); }).filter(Boolean);
+      if (!ids.length) return toast('Tick one or more requests to approve.');
+      if (!confirm('Approve ' + ids.length + ' promotion(s)? The new class is applied and the student is emailed.')) return;
+      busy(ab, true);
+      authed('admin/approvePromotions', { studentIds: ids }).then(function (r) {
+        busy(ab, false);
+        var okN = (r.approved || []).length, skN = (r.skipped || []).length;
+        toast('Approved ' + okN + (skN ? (', skipped ' + skN) : '') + '.');
+        if (skN) console.log('Approve skipped:', r.skipped);
+        loadPromotions();
+      }).catch(function (err) { busy(ab, false); fail(err); });
+    });
+  }
 
   qs('#results').addEventListener('change', function (e) {
     var t = e.target; if (!t || !t.closest) return;
