@@ -948,9 +948,11 @@ select.input { appearance: auto; background: var(--surface); }
         </select>
       </div>
 
+      <style>#results .promo-check{display:none} #results.wha-selmode .promo-check{display:inline-block}</style>
       <div class="stu-toolbar" style="gap:8px;flex-wrap:wrap;">
-        <button class="btn btn--secondary btn--sm" type="button" id="promo-promote-btn">Promote selected</button>
-        <button class="btn btn--quiet btn--sm" type="button" id="promo-unpromote-btn">Do not promote (undo)</button>
+        <button class="btn btn--secondary btn--sm" type="button" id="promo-select-btn">Select students</button>
+        <button class="btn btn--secondary btn--sm" type="button" id="promo-promote-btn" style="display:none;">Promote selected</button>
+        <button class="btn btn--quiet btn--sm" type="button" id="promo-unpromote-btn" style="display:none;">Do not promote (undo)</button>
         <button class="btn btn--quiet btn--sm" type="button" id="promo-review-btn">Review promotion requests</button>
         <span class="muted" id="promo-sel-count" style="align-self:center;font-size:.82rem;"></span>
       </div>
@@ -3873,10 +3875,24 @@ window.WHAAdminRecheckBridge = {
     var n = promoSelectedIds().length;
     var el = qs('#promo-sel-count'); if (el) el.textContent = n ? (n + ' selected') : '';
   }
+  function clearPromoChecks(){
+    Array.prototype.slice.call(document.querySelectorAll('#results .promo-check:checked')).forEach(function(c){ c.checked = false; });
+    promoUpdateCount();
+  }
+  function setPromoSelMode(on){
+    var res = qs('#results'); if (res) res.classList.toggle('wha-selmode', on);
+    var pp = qs('#promo-promote-btn'), up = qs('#promo-unpromote-btn'), sb = qs('#promo-select-btn');
+    if (pp) pp.style.display = on ? '' : 'none';
+    if (up) up.style.display = on ? '' : 'none';
+    if (sb) sb.textContent = on ? 'Done selecting' : 'Select students';
+    if (!on) clearPromoChecks();
+  }
   qs('#results').addEventListener('change', function (e) {
     if (e.target && e.target.classList && e.target.classList.contains('promo-check')) promoUpdateCount();
   });
   (function(){
+    var sb = qs('#promo-select-btn');
+    if (sb) sb.addEventListener('click', function(){ var res = qs('#results'); setPromoSelMode(!(res && res.classList.contains('wha-selmode'))); });
     var pb = qs('#promo-promote-btn');
     if (pb) pb.addEventListener('click', function () {
       var ids = promoSelectedIds();
@@ -3888,6 +3904,7 @@ window.WHAAdminRecheckBridge = {
         var okN = (r.promoted || []).length, skN = (r.skipped || []).length;
         toast('Promoted ' + okN + (skN ? (', skipped ' + skN) : '') + '.');
         if (skN) console.log('Promote skipped:', r.skipped);
+        clearPromoChecks();
       }).catch(function (err) { busy(pb, false); fail(err); });
     });
     var upb = qs('#promo-unpromote-btn');
@@ -3902,6 +3919,7 @@ window.WHAAdminRecheckBridge = {
         toast('Undone ' + okN + (skN ? (', skipped ' + skN) : '') + '.');
         if (skN) console.log('Undo skipped:', r.skipped);
         var pp = qs('#promo-panel'); if (pp && pp.innerHTML) loadPromotions();
+        clearPromoChecks();
       }).catch(function (err) { busy(upb, false); fail(err); });
     });
     var rb = qs('#promo-review-btn');
@@ -3909,9 +3927,9 @@ window.WHAAdminRecheckBridge = {
     var ppanel = qs('#promo-panel');
     if (ppanel) ppanel.addEventListener('click', function (e) {
       var b = e.target.closest('[data-act]'); if (!b) return;
-      var a = b.getAttribute('data-act');
-      if (a === 'promo-approve') return promoApprove(b);
-      if (a === 'promo-cancel') return promoCancel(b);
+      var a = b.getAttribute('data-act'), key = b.getAttribute('data-key');
+      if (a === 'promo-approve-one') return promoDoApprove([key], b);
+      if (a === 'promo-remove-one') return promoDoRemove([key], b);
     });
   })();
 
@@ -3931,63 +3949,62 @@ window.WHAAdminRecheckBridge = {
   function renderPromotions(r){
     var panel = qs('#promo-panel');
     var wait = r.awaitingStudent || [], appr = r.awaitingApproval || [];
-    var html = '<div class="stu-sec">Awaiting your approval (' + appr.length + ')</div>';
-    if (!appr.length) html += '<p class="muted">No requests awaiting approval.</p>';
-    else {
-      html += appr.map(function (s) {
-        return '<label style="display:flex;gap:10px;align-items:flex-start;padding:8px 0;border-bottom:1px solid var(--line,#e5e7eb);">' +
-          '<input type="checkbox" class="promo-appr promo-sel" data-key="' + esc(s.studentId) + '" style="margin-top:3px;">' +
-          '<span><strong>' + esc(s.fullName || '—') + '</strong> <span class="muted" style="font-family:ui-monospace,monospace;font-size:.8rem;">' + esc(s.studentId) + '</span>' +
-          '<br><span class="muted" style="font-size:.85rem;">' + promoDraftLine(s.draft) + '</span></span>' +
-        '</label>';
-      }).join('');
-      html += '<div style="margin-top:10px;display:flex;gap:8px;flex-wrap:wrap;">' +
-        '<button class="btn btn--primary btn--sm" type="button" data-act="promo-approve">Approve selected</button>' +
-        '<button class="btn btn--quiet btn--sm" type="button" data-act="promo-cancel">Cancel selected (undo)</button>' +
+    var steps = '<div style="background:#eef2ff;border:1px solid #c7d2fe;border-radius:12px;padding:12px 14px;margin-bottom:14px;font-size:.88rem;color:#3730a3;line-height:1.5;">' +
+      '<strong>How promotion works</strong><br>' +
+      '1. You <b>Promote</b> a student → at their next login they fill a short new-class form.<br>' +
+      '2. They submit it → they appear in <b>“Needs your approval”</b> below.<br>' +
+      '3. You check their chosen class/subjects/plan and <b>Approve</b> → their new class opens.<br>' +
+      'Nothing is final until you Approve. Use <b>Remove</b> to take anyone out of promotion (they go back to normal). ' +
+      'To edit a student’s details, use <b>Edit details</b> on their card in the list.</div>';
+
+    var s1 = '<div class="stu-sec">Needs your approval (' + appr.length + ')</div>';
+    if (!appr.length) s1 += '<p class="muted">Nobody is waiting for approval right now.</p>';
+    else s1 += appr.map(function (s) {
+      return '<div style="border:1px solid #e5e7eb;border-radius:12px;padding:12px 14px;margin-bottom:10px;">' +
+        '<div style="font-weight:700;">' + esc(s.fullName || '—') +
+          ' <span class="muted" style="font-family:ui-monospace,monospace;font-size:.78rem;font-weight:400;">' + esc(s.studentId) + '</span></div>' +
+        '<div class="muted" style="font-size:.86rem;margin:4px 0 10px;">Chosen for new class: ' + promoDraftLine(s.draft) + '</div>' +
+        '<div style="display:flex;gap:8px;flex-wrap:wrap;">' +
+          '<button class="btn btn--primary btn--sm" type="button" data-act="promo-approve-one" data-key="' + esc(s.studentId) + '">Approve &amp; open new class</button>' +
+          '<button class="btn btn--quiet btn--sm" type="button" data-act="promo-remove-one" data-key="' + esc(s.studentId) + '">Remove</button>' +
+        '</div>' +
       '</div>';
-    }
-    html += '<div class="stu-sec" style="margin-top:16px;">Awaiting student form (' + wait.length + ')</div>';
-    if (!wait.length) html += '<p class="muted">None.</p>';
-    else {
-      html += wait.map(function (s) {
-        return '<label style="display:flex;gap:10px;align-items:center;padding:6px 0;">' +
-          '<input type="checkbox" class="promo-sel" data-key="' + esc(s.studentId) + '" style="width:16px;height:16px;">' +
-          '<span class="muted" style="font-size:.85rem;"><strong>' + esc(s.fullName || '—') + '</strong> ' + esc(s.studentId) + ' → Class ' + esc(String(s.targetClass || '')) + ' (waiting for student)</span>' +
-        '</label>';
-      }).join('');
-      html += '<div style="margin-top:10px;"><button class="btn btn--quiet btn--sm" type="button" data-act="promo-cancel">Cancel selected (undo)</button></div>';
-    }
-    panel.innerHTML = html;
+    }).join('');
+
+    var s2 = '<div class="stu-sec" style="margin-top:18px;">Waiting for student to fill the form (' + wait.length + ')</div>';
+    if (!wait.length) s2 += '<p class="muted">None.</p>';
+    else s2 += wait.map(function (s) {
+      return '<div style="border:1px solid #e5e7eb;border-radius:12px;padding:10px 14px;margin-bottom:8px;display:flex;justify-content:space-between;align-items:center;gap:10px;flex-wrap:wrap;">' +
+        '<div><span style="font-weight:700;">' + esc(s.fullName || '—') + '</span> ' +
+          '<span class="muted" style="font-family:ui-monospace,monospace;font-size:.78rem;">' + esc(s.studentId) + '</span> ' +
+          '<span class="muted" style="font-size:.85rem;">→ Class ' + esc(String(s.targetClass || '')) + '</span></div>' +
+        '<button class="btn btn--quiet btn--sm" type="button" data-act="promo-remove-one" data-key="' + esc(s.studentId) + '">Remove</button>' +
+      '</div>';
+    }).join('');
+
+    panel.innerHTML = steps + s1 + s2;
   }
-  function promoApprove(btn){
-    var panel = qs('#promo-panel');
-    var ids = Array.prototype.slice.call(panel.querySelectorAll('.promo-appr:checked'))
-      .map(function(c){ return c.getAttribute('data-key'); }).filter(Boolean);
-    if (!ids.length) return toast('Tick one or more requests to approve.');
-    if (!confirm('Approve ' + ids.length + ' promotion(s)? The new class is applied and the student is emailed.')) return;
-    busy(btn, true);
+  function promoDoApprove(ids, btn){
+    if (!ids || !ids[0]) return;
+    if (!confirm('Approve this student and open their new class? They will be emailed.')) return;
+    if (btn) busy(btn, true);
     authed('admin/approvePromotions', { studentIds: ids }).then(function (r) {
-      busy(btn, false);
       var okN = (r.approved || []).length, skN = (r.skipped || []).length;
-      toast('Approved ' + okN + (skN ? (', skipped ' + skN) : '') + '.');
+      toast(okN ? 'Approved — new class opened.' : ('Skipped ' + skN + '.'));
       if (skN) console.log('Approve skipped:', r.skipped);
       loadPromotions();
-    }).catch(function (err) { busy(btn, false); fail(err); });
+    }).catch(function (err) { if (btn) busy(btn, false); fail(err); });
   }
-  function promoCancel(btn){
-    var panel = qs('#promo-panel');
-    var ids = Array.prototype.slice.call(panel.querySelectorAll('.promo-sel:checked'))
-      .map(function(c){ return c.getAttribute('data-key'); }).filter(Boolean);
-    if (!ids.length) return toast('Tick one or more students to undo.');
-    if (!confirm('Undo promotion for ' + ids.length + ' student(s)? Their dashboard unlocks and nothing else changes.')) return;
-    busy(btn, true);
+  function promoDoRemove(ids, btn){
+    if (!ids || !ids[0]) return;
+    if (!confirm('Remove this student from promotion? They go back to normal (their current class) and the lock is removed.')) return;
+    if (btn) busy(btn, true);
     authed('admin/cancelPromotion', { studentIds: ids }).then(function (r) {
-      busy(btn, false);
       var okN = (r.cancelled || []).length, skN = (r.skipped || []).length;
-      toast('Undone ' + okN + (skN ? (', skipped ' + skN) : '') + '.');
-      if (skN) console.log('Cancel skipped:', r.skipped);
+      toast(okN ? 'Removed from promotion.' : ('Skipped ' + skN + '.'));
+      if (skN) console.log('Remove skipped:', r.skipped);
       loadPromotions();
-    }).catch(function (err) { busy(btn, false); fail(err); });
+    }).catch(function (err) { if (btn) busy(btn, false); fail(err); });
   }
 
   qs('#results').addEventListener('change', function (e) {
