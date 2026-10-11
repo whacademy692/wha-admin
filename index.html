@@ -3891,6 +3891,13 @@ window.WHAAdminRecheckBridge = {
     });
     var rb = qs('#promo-review-btn');
     if (rb) rb.addEventListener('click', loadPromotions);
+    var ppanel = qs('#promo-panel');
+    if (ppanel) ppanel.addEventListener('click', function (e) {
+      var b = e.target.closest('[data-act]'); if (!b) return;
+      var a = b.getAttribute('data-act');
+      if (a === 'promo-approve') return promoApprove(b);
+      if (a === 'promo-cancel') return promoCancel(b);
+    });
   })();
 
   function loadPromotions(){
@@ -3914,34 +3921,58 @@ window.WHAAdminRecheckBridge = {
     else {
       html += appr.map(function (s) {
         return '<label style="display:flex;gap:10px;align-items:flex-start;padding:8px 0;border-bottom:1px solid var(--line,#e5e7eb);">' +
-          '<input type="checkbox" class="promo-appr" data-key="' + esc(s.studentId) + '" style="margin-top:3px;">' +
+          '<input type="checkbox" class="promo-appr promo-sel" data-key="' + esc(s.studentId) + '" style="margin-top:3px;">' +
           '<span><strong>' + esc(s.fullName || '—') + '</strong> <span class="muted" style="font-family:ui-monospace,monospace;font-size:.8rem;">' + esc(s.studentId) + '</span>' +
           '<br><span class="muted" style="font-size:.85rem;">' + promoDraftLine(s.draft) + '</span></span>' +
         '</label>';
       }).join('');
-      html += '<div style="margin-top:10px;"><button class="btn btn--primary btn--sm" type="button" id="promo-approve-btn">Approve selected</button></div>';
+      html += '<div style="margin-top:10px;display:flex;gap:8px;flex-wrap:wrap;">' +
+        '<button class="btn btn--primary btn--sm" type="button" data-act="promo-approve">Approve selected</button>' +
+        '<button class="btn btn--quiet btn--sm" type="button" data-act="promo-cancel">Cancel selected (undo)</button>' +
+      '</div>';
     }
     html += '<div class="stu-sec" style="margin-top:16px;">Awaiting student form (' + wait.length + ')</div>';
     if (!wait.length) html += '<p class="muted">None.</p>';
-    else html += wait.map(function (s) {
-      return '<div class="muted" style="padding:6px 0;font-size:.85rem;"><strong>' + esc(s.fullName || '—') + '</strong> ' + esc(s.studentId) + ' → Class ' + esc(String(s.targetClass || '')) + ' (waiting for student)</div>';
-    }).join('');
+    else {
+      html += wait.map(function (s) {
+        return '<label style="display:flex;gap:10px;align-items:center;padding:6px 0;">' +
+          '<input type="checkbox" class="promo-sel" data-key="' + esc(s.studentId) + '" style="width:16px;height:16px;">' +
+          '<span class="muted" style="font-size:.85rem;"><strong>' + esc(s.fullName || '—') + '</strong> ' + esc(s.studentId) + ' → Class ' + esc(String(s.targetClass || '')) + ' (waiting for student)</span>' +
+        '</label>';
+      }).join('');
+      html += '<div style="margin-top:10px;"><button class="btn btn--quiet btn--sm" type="button" data-act="promo-cancel">Cancel selected (undo)</button></div>';
+    }
     panel.innerHTML = html;
-    var ab = qs('#promo-approve-btn');
-    if (ab) ab.addEventListener('click', function () {
-      var ids = Array.prototype.slice.call(panel.querySelectorAll('.promo-appr:checked'))
-        .map(function(c){ return c.getAttribute('data-key'); }).filter(Boolean);
-      if (!ids.length) return toast('Tick one or more requests to approve.');
-      if (!confirm('Approve ' + ids.length + ' promotion(s)? The new class is applied and the student is emailed.')) return;
-      busy(ab, true);
-      authed('admin/approvePromotions', { studentIds: ids }).then(function (r) {
-        busy(ab, false);
-        var okN = (r.approved || []).length, skN = (r.skipped || []).length;
-        toast('Approved ' + okN + (skN ? (', skipped ' + skN) : '') + '.');
-        if (skN) console.log('Approve skipped:', r.skipped);
-        loadPromotions();
-      }).catch(function (err) { busy(ab, false); fail(err); });
-    });
+  }
+  function promoApprove(btn){
+    var panel = qs('#promo-panel');
+    var ids = Array.prototype.slice.call(panel.querySelectorAll('.promo-appr:checked'))
+      .map(function(c){ return c.getAttribute('data-key'); }).filter(Boolean);
+    if (!ids.length) return toast('Tick one or more requests to approve.');
+    if (!confirm('Approve ' + ids.length + ' promotion(s)? The new class is applied and the student is emailed.')) return;
+    busy(btn, true);
+    authed('admin/approvePromotions', { studentIds: ids }).then(function (r) {
+      busy(btn, false);
+      var okN = (r.approved || []).length, skN = (r.skipped || []).length;
+      toast('Approved ' + okN + (skN ? (', skipped ' + skN) : '') + '.');
+      if (skN) console.log('Approve skipped:', r.skipped);
+      loadPromotions();
+    }).catch(function (err) { busy(btn, false); fail(err); });
+  }
+  function promoCancel(btn){
+    var panel = qs('#promo-panel');
+    var ids = Array.prototype.slice.call(panel.querySelectorAll('.promo-sel:checked'))
+      .map(function(c){ return c.getAttribute('data-key'); }).filter(Boolean);
+    if (!ids.length) return toast('Tick one or more students to undo.');
+    if (!confirm('Undo promotion for ' + ids.length + ' student(s)? Their dashboard unlocks and nothing else changes.')) return;
+    busy(btn, true);
+    authed('admin/cancelPromotion', { studentIds: ids }).then(function (r) {
+      busy(btn, false);
+      var okN = (r.cancelled || []).length, skN = (r.skipped || []).length;
+      toast('Undone ' + okN + (skN ? (', skipped ' + skN) : '') + '.');
+      if (skN) console.log('Cancel skipped:', r.skipped);
+      loadPromotions();
+    }).catch(function (err) { busy(btn, false); fail(err); });
   }
 
   qs('#results').addEventListener('change', function (e) {
