@@ -950,6 +950,7 @@ select.input { appearance: auto; background: var(--surface); }
 
       <div class="stu-toolbar" style="gap:8px;flex-wrap:wrap;">
         <button class="btn btn--secondary btn--sm" type="button" id="promo-promote-btn">Promote selected</button>
+        <button class="btn btn--quiet btn--sm" type="button" id="promo-unpromote-btn">Do not promote (undo)</button>
         <button class="btn btn--quiet btn--sm" type="button" id="promo-review-btn">Review promotion requests</button>
         <span class="muted" id="promo-sel-count" style="align-self:center;font-size:.82rem;"></span>
       </div>
@@ -3888,6 +3889,20 @@ window.WHAAdminRecheckBridge = {
         toast('Promoted ' + okN + (skN ? (', skipped ' + skN) : '') + '.');
         if (skN) console.log('Promote skipped:', r.skipped);
       }).catch(function (err) { busy(pb, false); fail(err); });
+    });
+    var upb = qs('#promo-unpromote-btn');
+    if (upb) upb.addEventListener('click', function () {
+      var ids = promoSelectedIds();
+      if (!ids.length) return toast('Tick one or more students on their cards first.');
+      if (!confirm('Undo promotion for ' + ids.length + ' student(s)? They go back to their current class and the lock is removed.')) return;
+      busy(upb, true);
+      authed('admin/cancelPromotion', { studentIds: ids }).then(function (r) {
+        busy(upb, false);
+        var okN = (r.cancelled || []).length, skN = (r.skipped || []).length;
+        toast('Undone ' + okN + (skN ? (', skipped ' + skN) : '') + '.');
+        if (skN) console.log('Undo skipped:', r.skipped);
+        var pp = qs('#promo-panel'); if (pp && pp.innerHTML) loadPromotions();
+      }).catch(function (err) { busy(upb, false); fail(err); });
     });
     var rb = qs('#promo-review-btn');
     if (rb) rb.addEventListener('click', loadPromotions);
