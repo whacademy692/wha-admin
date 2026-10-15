@@ -1732,18 +1732,28 @@ window.WHAAdminRecheckBridge = {
     subjectsByStream: {
       'Biology group':   ['Mathematics','Physics','Chemistry','Biology'],
       'Computer group':  ['Mathematics','Physics','Chemistry','Computer'],
-      'Pre-Medical':     ['Physics','Chemistry','Biology'],
-      'Pre-Engineering': ['Physics','Chemistry','Mathematics'],
-      'ICS':             ['Physics','Mathematics','Computer']
+      'Pre-Medical':     ['Mathematics','Physics'],
+      'Pre-Engineering': ['Mathematics','Physics'],
+      'ICS':             ['Mathematics','Physics']
     },
-    plans: { Middle:[['Starter',5000],['Pro',12000],['Advanced',18000]], Matric:[['Starter',2000],['Pro',3500],['Advanced',4500]], Intermediate:[['Starter',2500],['Pro',4500],['Advanced',5500]] },
+    // Plans = Basic / Plus / Max.
+    //   Middle (6-8):        [tier, flat price for all 5 subjects, price per subject]
+    //   Matric / Intermediate: [tier, price per subject]
+    plans: {
+      Middle:       [['Basic',2500,999],['Plus',4700,1700],['Max',5500,2500]],
+      Matric:       [['Basic',1200],['Plus',1999],['Max',2500]],
+      Intermediate: [['Basic',2000],['Plus',3300],['Max',3999]]
+    },
+    // Old names still stored on existing students -> shown as the new tier.
+    planLegacy: { Starter:'Basic', Pro:'Plus', Advanced:'Max' },
     tuition: ['Online','Home Tuition']
   };
   function edBandKey(c){ c=Number(c); return c<=8?'low':(c<=10?'matric':'inter'); }
   function edBandName(c){ c=Number(c); return c<=8?'Middle':(c<=10?'Matric':'Intermediate'); }
   function edSubjectsFor(cls, stream){
     if (Number(cls) <= 8) return ENROLL.subjectsMiddle;
-    return ENROLL.subjectsByStream[String(stream||'')] || [];
+    if (Number(cls) >= 11) return ['Mathematics','Physics'];   // Intermediate: Math & Physics only
+    return ENROLL.subjectsByStream[String(stream||'')] || [];  // 9-10: by group
   }
 
   function edDynamicHtml(cls, cur){
@@ -1754,16 +1764,43 @@ window.WHAAdminRecheckBridge = {
     var streamHtml = '<label class="stu-edit__row"><span class="stu-edit__lbl">Stream</span><select class="input" data-field="stream">'+sOpts+'</select></label>';
     var chosen = {}; (cur.subjects||[]).forEach(function(x){ chosen[String(x).trim().toLowerCase()]=1; });
     var subjList = edSubjectsFor(cls, cur.stream);
-    var chips = subjList.length
-      ? subjList.map(function(sub){ return '<label class="ed-chip"><input type="checkbox" data-subject value="'+esc(sub)+'"'+(chosen[sub.toLowerCase()]?' checked':'')+'><span>'+esc(sub)+'</span></label>'; }).join('')
+    // Subjects the student already has that are not in today's list (e.g. an older
+    // 11-12 student with Chemistry/Biology) stay visible + ticked, so Save never drops them silently.
+    var listed = {}; subjList.forEach(function(x){ listed[x.toLowerCase()]=1; });
+    var extraSubs = (cur.subjects||[]).map(function(x){ return String(x).trim(); })
+      .filter(function(x){ return x && !listed[x.toLowerCase()]; });
+    var allSubs = subjList.concat(extraSubs);
+    var chips = allSubs.length
+      ? allSubs.map(function(sub){ return '<label class="ed-chip"><input type="checkbox" data-subject value="'+esc(sub)+'"'+(chosen[sub.toLowerCase()]?' checked':'')+'><span>'+esc(sub)+'</span></label>'; }).join('')
       : '<span class="muted" style="font-size:.85rem;">Choose a stream first to see its subjects.</span>';
     var subsHtml = '<div class="stu-edit__row"><span class="stu-edit__lbl">Subjects</span><div class="ed-chips">'+chips+'</div></div>';
     var rows = ENROLL.plans[band];
-    var tierRow = rows.filter(function(p){ return p[0]===cur.plan; })[0];
-    var wantPrice = tierRow ? tierRow[1] : cur.price;
+    var curPlan = (ENROLL.planLegacy && ENROLL.planLegacy[cur.plan]) || cur.plan;   // old Starter/Pro/Advanced -> Basic/Plus/Max
+    var tierRow = rows.filter(function(p){ return p[0]===curPlan; })[0];
+    var wantPrice = (cur.price != null && cur.price !== '') ? cur.price : (tierRow ? tierRow[1] : '');
     var planOpts = '<option value="">\u2014 Select \u2014</option>' +
-      rows.map(function(p){ return '<option value="'+p[0]+'"'+(p[0]===cur.plan?' selected':'')+'>'+p[0]+'</option>'; }).join('');
-    var priceOpts = rows.map(function(p){ return '<option value="'+p[1]+'"'+(String(p[1])===String(wantPrice)?' selected':'')+'>PKR '+Number(p[1]).toLocaleString()+' ('+p[0]+')</option>'; }).join('');
+      rows.map(function(p){ return '<option value="'+p[0]+'"'+(p[0]===curPlan?' selected':'')+'>'+p[0]+'</option>'; }).join('');
+    var priceList = [];   // [value, label]
+    rows.forEach(function(p){
+      if (band === 'Middle') {
+        priceList.push([p[1], 'PKR '+Number(p[1]).toLocaleString()+' ('+p[0]+' \u00b7 all 5 subjects)']);
+        priceList.push([p[2], 'PKR '+Number(p[2]).toLocaleString()+' ('+p[0]+' \u00b7 per subject)']);
+      } else {
+        priceList.push([p[1], 'PKR '+Number(p[1]).toLocaleString()+' ('+p[0]+' per subject)']);
+      }
+    });
+    // A fee already saved on the student that is not one of today's prices (e.g. an old
+    // 5,000 Starter fee) is kept as its own selected option, so Save does not change it silently.
+    var priceOpts = '';
+    if (wantPrice !== '' && !priceList.some(function(x){ return String(x[0])===String(wantPrice); })) {
+      priceOpts += '<option value="'+esc(String(wantPrice))+'" selected>PKR '+Number(wantPrice).toLocaleString()+' (current fee)</option>';
+    }
+    var picked = priceOpts !== '';   // 2,500 is both Basic(all 5) and Max(per subject): mark only the first match
+    priceOpts += priceList.map(function(x){
+      var on = !picked && String(x[0])===String(wantPrice);
+      if (on) picked = true;
+      return '<option value="'+x[0]+'"'+(on?' selected':'')+'>'+x[1]+'</option>';
+    }).join('');
     var planHtml = '<label class="stu-edit__row"><span class="stu-edit__lbl">Plan</span><select class="input" data-field="plan">'+planOpts+'</select></label>'+
       '<label class="stu-edit__row"><span class="stu-edit__lbl">Plan price</span><select class="input" data-field="planPrice">'+priceOpts+'</select></label>';
     return streamHtml + subsHtml + planHtml;
@@ -4075,7 +4112,12 @@ window.WHAAdminRecheckBridge = {
       var band = edBandName(clsSel ? clsSel.value : 6);
       var row = ENROLL.plans[band].filter(function (p) { return p[0] === t.value; })[0];
       var ps = ed.querySelector('[data-field="planPrice"]');
-      if (row && ps) ps.value = String(row[1]);
+      if (row && ps) {
+        // Middle: all 5 subjects ticked -> flat price, otherwise per-subject price. Matric/Inter: per-subject.
+        var nSub = ed.querySelectorAll('[data-subject]:checked').length;
+        var useFlat = (band !== 'Middle') || nSub >= ENROLL.subjectsMiddle.length || nSub === 0;
+        ps.value = String(useFlat ? row[1] : row[2]);
+      }
     }
   });
 
