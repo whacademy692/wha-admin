@@ -563,6 +563,37 @@ select.input { appearance: auto; background: var(--surface); }
 .uq-recent { display: flex; justify-content: space-between; gap: 10px; flex-wrap: wrap; align-items: center; padding: 9px 12px; border: 1px solid var(--line, #e5e7eb); border-radius: 10px; background: #fff; margin-bottom: 8px; font-size: .9rem; }
 .uq-recent small { display: block; color: var(--muted, #6b7280); }
 @media (max-width: 560px) { .uq-form { grid-template-columns: 1fr; } }
+/* Plan changes: the two cards + request details */
+.pc-cards { display: grid; grid-template-columns: repeat(auto-fit, minmax(250px, 1fr)); gap: 12px; margin: 4px 0 18px; }
+.pc-card { display: flex; flex-direction: column; gap: 4px; text-align: left; width: 100%; padding: 14px 16px; border: 1.5px solid var(--line, #e5e7eb); border-radius: 14px; background: #fff; cursor: pointer; font: inherit; color: inherit; }
+.pc-card:hover { border-color: #a5b4fc; }
+.pc-card.is-on { border-color: #4f46e5; box-shadow: 0 8px 22px rgba(79,70,229,.15); }
+.pc-card--down:hover { border-color: #fdba74; }
+.pc-card--down.is-on { border-color: #b45309; box-shadow: 0 8px 22px rgba(180,83,9,.14); }
+.pc-card__top { display: flex; align-items: center; justify-content: space-between; gap: 8px; }
+.pc-card__name { font-weight: 800; font-size: 1.02rem; }
+.pc-card__n { min-width: 2rem; padding: 2px 10px; border-radius: 999px; background: #f59e0b; color: #1f2937; font-weight: 800; font-size: .85rem; text-align: center; }
+.pc-card__n--zero { background: #e5e7eb; color: #6b7280; }
+.pc-card__sub { font-size: .8rem; color: var(--muted, #6b7280); }
+.uq-kind { display: inline-block; padding: 2px 9px; border-radius: 999px; font-size: .72rem; font-weight: 800; letter-spacing: .04em; text-transform: uppercase; }
+.uq-kind--up { background: #e0e7ff; color: #3730a3; }
+.uq-kind--down { background: #ffedd5; color: #9a3412; }
+.uq-reason { margin: 8px 0; padding: 9px 11px; border-radius: 10px; background: #f1f5f9; border: 1px solid var(--line, #e5e7eb); font-size: .9rem; line-height: 1.5; }
+.uq-reason span { display: block; font-size: .72rem; color: var(--muted, #6b7280); text-transform: uppercase; letter-spacing: .05em; font-weight: 700; }
+.uq-reason p { margin: 4px 0 0; white-space: pre-wrap; overflow-wrap: anywhere; }
+.uq-info { margin: 8px 0; padding: 8px 10px; border-radius: 10px; background: #eef2ff; color: #3730a3; font-size: .85rem; line-height: 1.45; }
+.uq-rr { display: block; margin-top: 2px; color: #475569; font-size: .82rem; white-space: pre-wrap; overflow-wrap: anywhere; }
+.uq-form--note { grid-template-columns: 1fr; }
+/* Student edit form: computed monthly fee */
+.ed-fee { display: flex; flex-direction: column; gap: 2px; }
+.ed-fee b { font-size: 1.05rem; }
+.ed-fee small { color: var(--muted, #6b7280); font-size: .78rem; }
+.ed-fee .ed-fee__warn { color: #92400e; }
+/* Plan changes inside Overview */
+.pc-ov { display: grid; grid-template-columns: repeat(auto-fit, minmax(270px, 1fr)); gap: 20px; }
+.pc-ov h3 { margin: 0 0 8px; font-size: .92rem; }
+.pc-ov h3 small { font-weight: 400; color: var(--muted, #6b7280); }
+.bar__sub { font-weight: 400; color: var(--muted, #6b7280); font-size: .78rem; }
 /* Fee voucher */
 .vmodal{position:fixed;inset:0;z-index:10001;background:rgba(15,23,42,.5);display:flex;align-items:flex-start;justify-content:center;overflow:auto;padding:28px 16px;}
 .vmodal__card{background:#fff;border-radius:14px;max-width:560px;width:100%;box-shadow:0 24px 60px rgba(0,0,0,.3);padding:16px;}
@@ -900,13 +931,9 @@ select.input { appearance: auto; background: var(--surface); }
         Students
       </button>
       <button class="side__item" data-view="upgrades" type="button">
-        <svg viewBox="0 0 24 24" stroke-width="2" aria-hidden="true"><path stroke-linecap="round" stroke-linejoin="round" d="M12 19V5M5 12l7-7 7 7"/></svg>
-        Upgrade Requests
+        <svg viewBox="0 0 24 24" stroke-width="2" aria-hidden="true"><path stroke-linecap="round" stroke-linejoin="round" d="M7 20V4M7 4L3 8M7 4l4 4M17 4v16M17 20l-4-4M17 20l4-4"/></svg>
+        Plan Changes
         <span class="nav-badge" id="up-badge" hidden></span>
-      </button>
-      <button class="side__item" data-view="archived" type="button">
-        <svg viewBox="0 0 24 24" stroke-width="2" aria-hidden="true"><path stroke-linecap="round" stroke-linejoin="round" d="M3 7h18M5 7l1 13h12l1-13M9 11v6M15 11v6M9 7V4h6v3"/></svg>
-        Archived
       </button>
       <button class="side__item" data-view="papers" type="button">
         <svg viewBox="0 0 24 24" stroke-width="2" aria-hidden="true"><path stroke-linecap="round" stroke-linejoin="round" d="M12 3l7 3v5c0 4.5-3 7.5-7 9-4-1.5-7-4.5-7-9V6l7-3z"/><path stroke-linecap="round" stroke-linejoin="round" d="M9.5 12l1.8 1.8L15 9.8"/></svg>
@@ -931,6 +958,10 @@ select.input { appearance: auto; background: var(--surface); }
       <button class="side__item" data-view="analytics" type="button">
         <svg viewBox="0 0 24 24" stroke-width="2" aria-hidden="true"><path stroke-linecap="round" stroke-linejoin="round" d="M4 20V10M10 20V4M16 20v-6M20 20H3"/></svg>
         Analytics
+      </button>
+      <button class="side__item" data-view="archived" type="button">
+        <svg viewBox="0 0 24 24" stroke-width="2" aria-hidden="true"><path stroke-linecap="round" stroke-linejoin="round" d="M3 7h18M5 7l1 13h12l1-13M9 11v6M15 11v6M9 7V4h6v3"/></svg>
+        Archived
       </button>
     </nav>
 
@@ -992,15 +1023,15 @@ select.input { appearance: auto; background: var(--surface); }
     <section data-panel="upgrades" hidden>
       <header class="head">
         <div>
-          <h1 class="head__title">Upgrade Requests</h1>
+          <h1 class="head__title">Plan Changes</h1>
           <p class="head__sub">
-            Students asking to move to a higher plan. Once the upgrade fee has reached you, press
-            <strong>Approve</strong> — the new plan opens for them straight away. The amount shown is only a
-            suggestion (the days left in the month); change it before approving if you collected a different amount.
+            Students asking to move to a higher plan (upgrade) or a lower one (downgrade) &mdash; each must say why.
+            Pick a card to see only that list, with its history underneath. Newest requests are on top.
           </p>
         </div>
         <button class="btn btn--quiet btn--sm" data-act="up-refresh" type="button">Refresh</button>
       </header>
+      <div id="up-cards" class="pc-cards"></div>
       <div id="up-list"><p class="muted">Loading…</p></div>
     </section>
 
@@ -1686,7 +1717,33 @@ window.WHAAdminRecheckBridge = {
 
     host.innerHTML = '<div class="tiles">' + tiles + '</div>' +
       (rows ? '<div class="panel"><h2 class="panel__title">By class</h2><ul class="bars">' + rows + '</ul></div>' : '') +
-      (schoolRows ? '<div class="panel"><h2 class="panel__title">Schools (from enrollment forms)</h2><ul class="bars">' + schoolRows + '</ul></div>' : '');
+      (schoolRows ? '<div class="panel"><h2 class="panel__title">Schools (from enrollment forms)</h2><ul class="bars">' + schoolRows + '</ul></div>' : '') +
+      '<div id="plan-stats">' + planStatsHtml(planStats) + '</div>';
+  }
+
+  // How many students moved between plans (from the approved plan-change requests).
+  var planStats = null;
+  function planStatsHtml(st) {
+    if (!st || !st.paths) return '';
+    function group(kind, title, tot) {
+      tot = tot || {};
+      var rows = st.paths.filter(function (p) { return p.kind === kind; }).map(function (p) {
+        return '<li class="bar"><span>' + esc(p.from) + ' &rarr; ' + esc(p.to) + '</span>' +
+          '<span class="bar__value">' + esc(p.approved) + ' <span class="bar__sub">&middot; ' + esc(p.thisMonth) + ' this month' +
+          (p.pending ? ' &middot; ' + esc(p.pending) + ' waiting' : '') + '</span></span></li>';
+      }).join('');
+      return '<div><h3>' + title + ' <small>(' + esc(tot.approved || 0) + ' approved &middot; ' + esc(tot.thisMonth || 0) + ' this month &middot; ' +
+        esc(tot.pending || 0) + ' waiting)</small></h3><ul class="bars">' + rows + '</ul></div>';
+    }
+    return '<div class="panel"><h2 class="panel__title">Plan changes</h2><div class="pc-ov">' +
+      group('Upgrade', 'Upgrades', st.upgrades) + group('Downgrade', 'Downgrades', st.downgrades) + '</div></div>';
+  }
+  function loadPlanStats() {
+    return authed('admin/listUpgradeRequests', {}).then(function (d) {
+      planStats = (d && d.stats) || null;
+      var h = qs('#plan-stats'); if (h) h.innerHTML = planStatsHtml(planStats);
+      if (d && d.pending) setUpBadge(d.pending.length);
+    }).catch(function () { /* optional: the counts are a nicety */ });
   }
 
   function prettyKey(k){ return String(k).replace(/_/g,' ').replace(/([a-z0-9])([A-Z])/g,'$1 $2').replace(/^./,function(c){return c.toUpperCase();}); }
@@ -1715,6 +1772,13 @@ window.WHAAdminRecheckBridge = {
     var extra = '';
     Object.keys(fd).forEach(function(k){
       if (STU_HIDE_KEYS[k]) return;
+      if (k === 'planPrice') {
+        // Show the fee the pricing page gives for this class / plan / subjects. If the stored number differs, say so.
+        var std = stuStdFee(s, fd), saved = Number(fd[k]);
+        var txt = std != null ? ('PKR ' + std.toLocaleString() + (saved && saved !== std ? ' (saved as PKR ' + saved.toLocaleString() + ' \u2014 open Edit and Save to correct it)' : '')) : fmtVal(fd[k]);
+        extra += '<dt>Monthly fee</dt><dd>' + esc(txt) + '</dd>';
+        return;
+      }
       extra += '<dt>' + esc(prettyKey(k)) + '</dt><dd>' + esc(fmtVal(fd[k])) + '</dd>';
     });
     return '<div class="stu-body__acts">' +
@@ -1798,6 +1862,48 @@ window.WHAAdminRecheckBridge = {
     return ENROLL.subjectsByStream[String(stream||'')] || [];  // 9-10: by group
   }
 
+  // ---- monthly fee: one rule, the pricing-page prices ----
+  // Middle (6-8): all 5 subjects = the flat price, otherwise per-subject price x subjects.
+  // Matric / Intermediate: per-subject price x subjects. The server uses the same rule
+  // and recomputes the fee on every save, so what is shown here is what gets stored.
+  function edFee(band, tierName, n){
+    var rows = ENROLL.plans[band] || [], row = rows.filter(function(p){ return p[0] === tierName; })[0];
+    n = Number(n) || 0;
+    if (!row || n < 1) return null;
+    if (band === 'Middle') {
+      if (n >= ENROLL.subjectsMiddle.length) return { total: row[1], hint: 'All ' + n + ' subjects: flat PKR ' + Number(row[1]).toLocaleString() };
+      return { total: row[2] * n, hint: n + ' subject' + (n === 1 ? '' : 's') + ' \u00d7 PKR ' + Number(row[2]).toLocaleString() };
+    }
+    return { total: row[1] * n, hint: n + ' subject' + (n === 1 ? '' : 's') + ' \u00d7 PKR ' + Number(row[1]).toLocaleString() };
+  }
+  function edFeeInner(band, tierName, n, savedFee){
+    if (!tierName) return '<div class="ed-fee"><small>Choose a plan to see its monthly fee.</small><input type="hidden" data-field="planPrice" value=""></div>';
+    var f = edFee(band, tierName, n);
+    if (!f) return '<div class="ed-fee"><small>Tick at least one subject to see the monthly fee.</small><input type="hidden" data-field="planPrice" value=""></div>';
+    var warn = '';
+    if (savedFee != null && savedFee !== '' && Number(savedFee) !== f.total) {
+      warn = '<small class="ed-fee__warn">The saved fee is PKR ' + Number(savedFee).toLocaleString() + '. It will be corrected to PKR ' +
+        f.total.toLocaleString() + ' when you save.</small>';
+    }
+    return '<div class="ed-fee"><b>PKR ' + f.total.toLocaleString() + '</b>' +
+      '<small>' + esc(f.hint) + ' &middot; ' + esc(tierName) + ' plan</small>' + warn +
+      '<input type="hidden" data-field="planPrice" value="' + f.total + '"></div>';
+  }
+  function edUpdateFee(ed){
+    var slot = ed.querySelector('[data-fee-slot]'); if (!slot) return;
+    var cls = ed.querySelector('[data-field="classLevel"]'), plan = ed.querySelector('[data-field="plan"]');
+    slot.innerHTML = edFeeInner(edBandName(cls ? cls.value : 6), plan ? plan.value : '', ed.querySelectorAll('[data-subject]:checked').length, null);
+  }
+  // The fee this student should be paying today, from their saved class / plan / subjects (null if unknown).
+  function stuStdFee(s, fd){
+    var cls = Number(fd.classLevel) || Number(s.classLevel) || 0; if (!cls) return null;
+    var raw = fd.planTier || fd.plan || '';
+    var tier = (ENROLL.planLegacy && ENROLL.planLegacy[raw]) || raw;
+    var subs = Array.isArray(fd.subjects) ? fd.subjects : (fd.subjects ? String(fd.subjects).split(',').map(function(x){ return x.trim(); }).filter(Boolean) : []);
+    var f = edFee(edBandName(cls), tier, subs.length);
+    return f ? f.total : null;
+  }
+
   function edDynamicHtml(cls, cur){
     cur = cur || {};
     var k = edBandKey(cls), band = edBandName(cls);
@@ -1818,39 +1924,17 @@ window.WHAAdminRecheckBridge = {
     var subsHtml = '<div class="stu-edit__row"><span class="stu-edit__lbl">Subjects</span><div class="ed-chips">'+chips+'</div></div>';
     var rows = ENROLL.plans[band];
     var curPlan = (ENROLL.planLegacy && ENROLL.planLegacy[cur.plan]) || cur.plan;   // old Starter/Pro/Advanced -> Basic/Plus/Max
-    var tierRow = rows.filter(function(p){ return p[0]===curPlan; })[0];
-    var wantPrice = (cur.price != null && cur.price !== '') ? cur.price : (tierRow ? tierRow[1] : '');
     var planOpts = '<option value="">\u2014 Select \u2014</option>' +
       rows.map(function(p){ return '<option value="'+p[0]+'"'+(p[0]===curPlan?' selected':'')+'>'+p[0]+'</option>'; }).join('');
-    var priceList = [];   // [value, label]
-    rows.forEach(function(p){
-      if (band === 'Middle') {
-        priceList.push([p[1], 'PKR '+Number(p[1]).toLocaleString()+' ('+p[0]+' \u00b7 all 5 subjects)']);
-        priceList.push([p[2], 'PKR '+Number(p[2]).toLocaleString()+' ('+p[0]+' \u00b7 per subject)']);
-      } else {
-        priceList.push([p[1], 'PKR '+Number(p[1]).toLocaleString()+' ('+p[0]+' per subject)']);
-      }
-    });
-    // A fee already saved on the student that is not one of today's prices (e.g. an old
-    // 5,000 Starter fee) is kept as its own selected option, so Save does not change it silently.
-    var priceOpts = '';
-    if (wantPrice !== '' && !priceList.some(function(x){ return String(x[0])===String(wantPrice); })) {
-      priceOpts += '<option value="'+esc(String(wantPrice))+'" selected>PKR '+Number(wantPrice).toLocaleString()+' (current fee)</option>';
-    }
-    var picked = priceOpts !== '';   // 2,500 is both Basic(all 5) and Max(per subject): mark only the first match
-    priceOpts += priceList.map(function(x){
-      var on = !picked && String(x[0])===String(wantPrice);
-      if (on) picked = true;
-      return '<option value="'+x[0]+'"'+(on?' selected':'')+'>'+x[1]+'</option>';
-    }).join('');
+    var nChecked = allSubs.filter(function(x){ return chosen[x.toLowerCase()]; }).length;
     var planHtml = '<label class="stu-edit__row"><span class="stu-edit__lbl">Plan</span><select class="input" data-field="plan">'+planOpts+'</select></label>'+
-      '<label class="stu-edit__row"><span class="stu-edit__lbl">Plan price</span><select class="input" data-field="planPrice">'+priceOpts+'</select></label>';
+      '<div class="stu-edit__row"><span class="stu-edit__lbl">Monthly fee</span><div data-fee-slot>'+edFeeInner(band, curPlan, nChecked, cur.savedFee)+'</div></div>';
     return streamHtml + subsHtml + planHtml;
   }
   function edCurrentFromForm(ed){
     function v(f){ var el=ed.querySelector('[data-field="'+f+'"]'); return el?el.value:''; }
     var subs = Array.prototype.map.call(ed.querySelectorAll('[data-subject]:checked'), function(c){ return c.value; });
-    return { stream:v('stream'), plan:v('plan'), price:v('planPrice'), subjects:subs };
+    return { stream:v('stream'), plan:v('plan'), subjects:subs };
   }
 
   function stuEditForm(s, key){
@@ -1863,7 +1947,7 @@ window.WHAAdminRecheckBridge = {
     if (cls < 6) cls = 6; if (cls > 12) cls = 12;
     var subjects = Array.isArray(fd.subjects) ? fd.subjects
       : (fd.subjects ? String(fd.subjects).split(',').map(function(x){return x.trim();}).filter(Boolean) : []);
-    var cur = { stream: fd.stream||'', subjects: subjects, plan: fd.plan||fd.planTier||'', price: fd.planPrice };
+    var cur = { stream: fd.stream||'', subjects: subjects, plan: fd.plan||fd.planTier||'', savedFee: fd.planPrice };
 
     var classOpts = '';
     for (var c=6;c<=12;c++){ classOpts += '<option value="'+c+'"'+(c===cls?' selected':'')+'>Class '+c+'</option>'; }
@@ -1871,7 +1955,7 @@ window.WHAAdminRecheckBridge = {
       ENROLL.tuition.map(function(t){ return '<option'+(t===(fd.tuitionMode||'')?' selected':'')+'>'+esc(t)+'</option>'; }).join('');
 
     var html = '<div class="stu-edit">' +
-      '<p class="stu-edit__hint">Same fields as the enrollment form. Changing Class updates Stream, Subjects and Plan for that level. Changing Subjects or Class updates which games this student can play.</p>';
+      '<p class="stu-edit__hint">Same fields as the enrollment form. Changing Class updates Stream, Subjects and Plan for that level. Changing Subjects or Class updates which games this student can play. The monthly fee is worked out for you from the class, plan and number of subjects, using the pricing-page prices.</p>';
     html += txt('fullName','Full name', s.fullName || fd.fullName || '');
     html += txt('email','Email', s.email || fd.email || '');
     html += '<label class="stu-edit__row"><span class="stu-edit__lbl">Class</span><select class="input" data-field="classLevel">'+classOpts+'</select></label>';
@@ -1959,7 +2043,8 @@ window.WHAAdminRecheckBridge = {
     var billing = vMon(now.getMonth()) + ' ' + now.getFullYear();
     var due = new Date(now.getTime() + 7*864e5);
     var dueStr = due.getFullYear() + '-' + ('0'+(due.getMonth()+1)).slice(-2) + '-' + ('0'+due.getDate()).slice(-2);
-    var amount = (fd.planPrice!=null && fd.planPrice!=='') ? fd.planPrice : '';
+    var stdFee = stuStdFee(s, fd);   // the pricing-page fee, not whatever number was stored
+    var amount = stdFee != null ? stdFee : ((fd.planPrice!=null && fd.planPrice!=='') ? fd.planPrice : '');
     var monthly = Number(amount) || 0;
     // Date the student joined (Pakistan time): activation date, else the form date.
     var joinedIso = vPktDate(s.activatedAt || s.submittedAt);
@@ -2129,9 +2214,14 @@ window.WHAAdminRecheckBridge = {
     if (!iso) return '—';
     var d = new Date(iso); if (isNaN(d.getTime())) return '—';
     var mon = ['Jan','Feb','Mar','Apr','May','Jun','Jul','Aug','Sep','Oct','Nov','Dec'];
+    var plain = /^(\d{4})-(\d{2})-(\d{2})$/.exec(String(iso));   // a calendar date with no time: never shift it by time zone
+    if (plain) return Number(plain[3]) + ' ' + mon[Number(plain[2]) - 1] + ' ' + plain[1];
     var hh = d.getHours(), ap = hh < 12 ? 'am' : 'pm', h12 = (hh % 12) || 12;
-    return d.getDate() + ' ' + mon[d.getMonth()] + ' ' + (d.getFullYear() % 100) + ', ' + h12 + ':' + ('0'+d.getMinutes()).slice(-2) + ap;
+    // Always day, month and FULL year ("15 Oct 2026, 5:16 pm").
+    return d.getDate() + ' ' + mon[d.getMonth()] + ' ' + d.getFullYear() + ', ' + h12 + ':' + ('0'+d.getMinutes()).slice(-2) + ap;
   }
+  // Same, but a value that is not a date at all is shown as it came instead of a dash.
+  function fmtDateKeep(v) { var f = fmtDate(v); return f === '\u2014' ? String(v == null ? '' : v) : f; }
   function currentFilter() { var f = qs('#f-filter'); return f ? f.value : 'all'; }
   function filteredResults() {
     var f = currentFilter();
@@ -2202,7 +2292,11 @@ window.WHAAdminRecheckBridge = {
   // ---------------------------------------------------------------- actions
   function loadStats() {
     return authed('admin/statistics', {})
-      .then(renderStats)
+      .then(function (st) {
+        renderStats(st);
+        var ov = qs('[data-panel="overview"]');
+        if (ov && !ov.hidden) loadPlanStats();
+      })
       .catch(function (err) {
         // Counts are a nicety; the console stays usable without them. An auth
         // failure still ends the session.
@@ -3103,7 +3197,7 @@ window.WHAAdminRecheckBridge = {
       var pill = '<span class="gr-pill gr-pill--' + st + '">' + esc(s.status) + '</span>';
       var isGraded = (s.status === 'Graded' || s.status === 'Rechecked');
       var marks = (s.awardedMarks == null) ? '' : ('<span class="cell-sub">' + esc(s.awardedMarks) + ' / ' + esc(s.totalMarks) + '</span>');
-      var when = s.submittedAt ? ('<div class="cell-sub">Submitted ' + esc(s.submittedAt) + '</div>') : '';
+      var when = s.submittedAt ? ('<div class="cell-sub">Submitted ' + esc(fmtDateKeep(s.submittedAt)) + '</div>') : '';
       var btn = '<button class="btn ' + (isGraded ? 'btn--quiet' : 'btn--primary') + ' btn--sm" data-act="gr-open-grade" data-sub="' + esc(s.submissionId) + '">' + (isGraded ? 'Review / edit' : 'Grade') + '</button>';
       return '<div class="pp-row"><div class="pp-row__main"><div class="pp-row__title">' + esc(s.studentName || 'Student') +
         ' <span class="cell-sub">' + esc(s.studentId) + '</span></div>' + when + '</div>' +
@@ -3206,7 +3300,7 @@ window.WHAAdminRecheckBridge = {
     grState.total = Number(d.totalMarks) || 0;
     qs('#gr-grade-title').textContent = d.studentName || 'Student';
     qs('#gr-grade-sub').textContent = esc(d.studentId) + ' · ' + (d.paperTitle || '') + ' · ' + grState.total + ' marks total' +
-      (d.gradedAt ? ' · last graded ' + d.gradedAt : '');
+      (d.gradedAt ? ' · last graded ' + fmtDateKeep(d.gradedAt) : '');
     qs('#gr-overall').value = d.overallFeedback || '';
     qs('#gr-grade-host').innerHTML = (d.items || []).map(grQuestionCard).join('');
     if (window.MathText) MathText.render(qs('#gr-grade-host'));
@@ -3764,7 +3858,7 @@ window.WHAAdminRecheckBridge = {
   }
 
   var AN_MONTHS = ['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun', 'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec'];
-  function anFmtDate(d) { var p = String(d).split('-'); return p.length === 3 ? (parseInt(p[2], 10) + ' ' + (AN_MONTHS[parseInt(p[1], 10) - 1] || '')) : d; }
+  function anFmtDate(d) { var p = String(d).split('-'); return p.length === 3 ? (parseInt(p[2], 10) + ' ' + (AN_MONTHS[parseInt(p[1], 10) - 1] || '') + ' ' + p[0]) : d; }
   function anAccColor(a) { return a < 0.5 ? '#ef4444' : (a < 0.75 ? '#f59e0b' : '#22c55e'); }
 
   function anComputeTrend() {
@@ -3793,8 +3887,10 @@ window.WHAAdminRecheckBridge = {
         '<text x="' + (padL - 6) + '" y="' + (yy + 3) + '" text-anchor="end" font-size="10" fill="#6b7280">' + Math.round(v * 100) + '%</text>';
     });
     var step = n <= 8 ? 1 : Math.ceil(n / 7), xlab = '';
+    // Labels carry the full year now, so keep the last one from landing on top of its neighbour.
+    var minGap = Math.ceil(66 / (plotW / Math.max(1, n - 1)));
     points.forEach(function (pt, i) {
-      if (i % step === 0 || i === n - 1) xlab += '<text x="' + X(i) + '" y="' + (H - padB + 16) + '" text-anchor="middle" font-size="10" fill="#6b7280">' + anFmtDate(pt.date) + '</text>';
+      if (i === n - 1 || (i % step === 0 && (n - 1 - i) >= minGap)) xlab += '<text x="' + X(i) + '" y="' + (H - padB + 16) + '" text-anchor="middle" font-size="10" fill="#6b7280">' + anFmtDate(pt.date) + '</text>';
     });
     var defs = '<defs><linearGradient id="anAccGrad" x1="0" y1="' + padT + '" x2="0" y2="' + (padT + plotH) + '" gradientUnits="userSpaceOnUse">' +
       '<stop offset="0" stop-color="#22c55e"/><stop offset="0.5" stop-color="#f59e0b"/><stop offset="1" stop-color="#ef4444"/></linearGradient></defs>';
@@ -3997,13 +4093,27 @@ window.WHAAdminRecheckBridge = {
   }
 
   // ==========================================================================
-  // UPGRADE REQUESTS — a student asks for a higher plan; the admin checks the fee
-  // arrived and approves. The server works out the plan and the suggested amount;
-  // the admin may change the amount collected before approving.
+  // PLAN CHANGES — a student asks to move to a higher plan (Upgrade) or a lower
+  // one (Downgrade) and has to say why. The server works out the plan and the
+  // fee; for an upgrade the admin checks the money arrived (and may change the
+  // amount collected), for a downgrade nothing is collected. Two cards choose
+  // which list is shown; each list has the waiting requests (newest first) with
+  // that kind's history underneath.
   // ==========================================================================
-  var upData = { pending: [], recent: [] };
+  var upData = { pending: [], recent: [], stats: null };
+  var upKind = null;   // 'Upgrade' | 'Downgrade' - the card the admin picked (null until the first load decides)
+  var UP_MON = ['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun', 'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec'];
 
   function upMoney(n) { return 'PKR ' + (Number(n) || 0).toLocaleString('en-US'); }
+  function upKindOf(r) { return r && r.kind === 'Downgrade' ? 'Downgrade' : 'Upgrade'; }   // rows from before downgrades existed are upgrades
+  function upTime(v) { var t = new Date(v).getTime(); return isNaN(t) ? 0 : t; }
+  // "1 Nov 2026": the first day of the month after `iso`, on the Pakistan calendar.
+  function upNextMonth(iso) {
+    var base = iso ? upTime(iso) : Date.now();
+    var t = new Date((base || Date.now()) + 5 * 3600 * 1000), m = t.getUTCMonth();
+    return '1 ' + UP_MON[(m + 1) % 12] + ' ' + (m === 11 ? t.getUTCFullYear() + 1 : t.getUTCFullYear());
+  }
+  function upFrom(r) { return r.effectiveFrom ? fmtDate(r.effectiveFrom) : upNextMonth(r.requestedAt); }
 
   function setUpBadge(n) {
     var b = qs('#up-badge'); if (!b) return;
@@ -4011,8 +4121,8 @@ window.WHAAdminRecheckBridge = {
     b.hidden = !(n > 0);
   }
 
-  // Quiet count for the sidebar badge — never shows an error (the backend may not
-  // have the upgrade routes yet, and a badge is not worth a red toast).
+  // Quiet count for the sidebar badge - never shows an error (the backend may not
+  // have the plan-change routes yet, and a badge is not worth a red toast).
   function refreshUpBadge() {
     return authed('admin/listUpgradeRequests', {})
       .then(function (d) { setUpBadge(((d && d.pending) || []).length); })
@@ -4021,38 +4131,53 @@ window.WHAAdminRecheckBridge = {
 
   function loadUpgrades() {
     var host = qs('#up-list'); if (!host) return;
-    host.innerHTML = '<p class="muted">Loading…</p>';
+    host.innerHTML = '<p class="muted">Loading\u2026</p>';
     return authed('admin/listUpgradeRequests', {})
       .then(function (d) {
-        upData = { pending: (d && d.pending) || [], recent: (d && d.recent) || [] };
+        upData = { pending: (d && d.pending) || [], recent: (d && d.recent) || [], stats: (d && d.stats) || null };
         setUpBadge(upData.pending.length);
+        if (!upKind) {   // open on the card that has more waiting (upgrades when equal)
+          var nUp = upData.pending.filter(function (r) { return upKindOf(r) === 'Upgrade'; }).length;
+          upKind = (upData.pending.length - nUp) > nUp ? 'Downgrade' : 'Upgrade';
+        }
         renderUpgrades();
       })
-      .catch(function (e) { host.innerHTML = ''; fail(e, 'Could not load upgrade requests.'); });
+      .catch(function (e) { host.innerHTML = ''; fail(e, 'Could not load plan change requests.'); });
   }
 
-  function upPending(r) {
-    var diff = (Number(r.newFee) || 0) - (Number(r.currentFee) || 0);
-    var review = diff <= 0;
-    var sent = !!r.feeSent;
-    return '<div class="uq-card" data-req="' + esc(r.requestId) + '">' +
-      '<div class="uq-top">' +
-        '<div class="uq-name">' + esc(r.fullName || '—') + ' <span class="uq-id">' + esc(r.studentId) + '</span>' +
+  function upReasonBlock(r) {
+    if (!r.reason && !r.reasonNote) return '<div class="uq-reason"><span>Reason</span>No reason was recorded (older request).</div>';
+    return '<div class="uq-reason"><span>Reason</span><b>' + esc(r.reason || '\u2014') + '</b>' +
+      (r.reasonNote ? '<p>' + esc(r.reasonNote) + '</p>' : '') + '</div>';
+  }
+
+  function upHead(r) {
+    var down = upKindOf(r) === 'Downgrade';
+    return '<div class="uq-top">' +
+        '<div class="uq-name">' + esc(r.fullName || '\u2014') + ' <span class="uq-id">' + esc(r.studentId) + '</span>' +
           (r.classLevel ? ' <span class="badge badge--neutral">Class ' + esc(r.classLevel) + '</span>' : '') + '</div>' +
         '<div class="uq-when">Requested ' + esc(fmtDate(r.requestedAt)) + '</div>' +
       '</div>' +
-      '<div class="uq-change"><span class="badge badge--neutral">' + esc(r.fromTier) + '</span> &rarr; ' +
-        '<span class="badge badge--ok">' + esc(r.toTier) + '</span>' +
-        '<span class="uq-when" style="font-weight:400;">' + esc(r.subjectCount) + ' subject' + (Number(r.subjectCount) === 1 ? '' : 's') + '</span></div>' +
+      '<div class="uq-change"><span class="uq-kind ' + (down ? 'uq-kind--down' : 'uq-kind--up') + '">' + (down ? 'Downgrade' : 'Upgrade') + '</span> ' +
+        '<span class="badge badge--neutral">' + esc(r.fromTier) + '</span> &rarr; ' +
+        '<span class="badge ' + (down ? 'badge--warn' : 'badge--ok') + '">' + esc(r.toTier) + '</span>' +
+        '<span class="uq-when" style="font-weight:400;">' + esc(r.subjectCount) + ' subject' + (Number(r.subjectCount) === 1 ? '' : 's') + '</span></div>';
+  }
+
+  function upPendingUp(r) {
+    var diff = (Number(r.newFee) || 0) - (Number(r.currentFee) || 0);
+    var review = diff <= 0;
+    var sent = !!r.feeSent;
+    return '<div class="uq-card" data-req="' + esc(r.requestId) + '" data-kind="Upgrade">' + upHead(r) +
       '<div class="uq-grid">' +
         '<div class="uq-cell"><span>Current monthly fee</span><b>' + upMoney(r.currentFee) + '</b></div>' +
-        '<div class="uq-cell"><span>New monthly fee</span><b>' + upMoney(r.newFee) + '</b><small>from next month</small></div>' +
-        '<div class="uq-cell"><span>Suggested to collect now</span><b>' + (review ? '—' : upMoney(r.dueNow)) + '</b>' +
+        '<div class="uq-cell"><span>New monthly fee</span><b>' + upMoney(r.newFee) + '</b><small>from ' + esc(upFrom(r)) + '</small></div>' +
+        '<div class="uq-cell"><span>Suggested to collect now</span><b>' + (review ? '\u2014' : upMoney(r.dueNow)) + '</b>' +
           (review ? '' : '<small>' + esc(r.daysLeft) + ' of ' + esc(r.daysInMonth) + ' days left this month</small>') + '</div>' +
         '<div class="uq-cell"><span>Student says fee sent</span>' +
           (sent ? '<b style="color:#065f46;">Yes</b>' : '<b style="color:#92400e;">Not yet</b>') +
           (r.feeReference ? '<small>Ref: ' + esc(r.feeReference) + '</small>' : '') + '</div>' +
-      '</div>' +
+      '</div>' + upReasonBlock(r) +
       (review ? '<div class="uq-warn">This student\u2019s old monthly fee (' + upMoney(r.currentFee) + ') is not lower than today\u2019s ' +
         esc(r.toTier) + ' price (' + upMoney(r.newFee) + '), so no amount could be suggested. Decide what to collect and type it below.</div>' : '') +
       (sent ? '' : '<div class="uq-warn">The student has not said they sent the fee yet. Check before you approve.</div>') +
@@ -4067,27 +4192,71 @@ window.WHAAdminRecheckBridge = {
     '</div>';
   }
 
+  function upPendingDown(r) {
+    var from = upFrom(r);
+    return '<div class="uq-card" data-req="' + esc(r.requestId) + '" data-kind="Downgrade">' + upHead(r) +
+      '<div class="uq-grid">' +
+        '<div class="uq-cell"><span>Current monthly fee</span><b>' + upMoney(r.currentFee) + '</b></div>' +
+        '<div class="uq-cell"><span>New monthly fee</span><b>' + upMoney(r.newFee) + '</b><small>from ' + esc(from) + '</small></div>' +
+        '<div class="uq-cell"><span>To collect now</span><b>Nothing</b><small>a lower plan costs nothing to move to</small></div>' +
+      '</div>' + upReasonBlock(r) +
+      '<div class="uq-info">Approving moves the student to <b>' + esc(r.toTier) + '</b> straight away, so they lose the higher-plan features at once. ' +
+        'Their lower fee starts <b>' + esc(from) + '</b>. If you want them to keep the features until then, approve it on or after that date.</div>' +
+      '<div class="uq-form uq-form--note">' +
+        '<label>Note to student (optional)<input class="input" type="text" maxlength="300" data-uq-note placeholder="e.g. Your lower plan starts next month"></label>' +
+      '</div>' +
+      '<div class="uq-acts">' +
+        '<button class="btn btn--primary btn--sm" type="button" data-act="up-approve" data-id="' + esc(r.requestId) + '">Approve &amp; move to ' + esc(r.toTier) + '</button>' +
+        '<button class="btn btn--quiet btn--sm" type="button" data-act="up-reject" data-id="' + esc(r.requestId) + '">Reject</button>' +
+      '</div>' +
+    '</div>';
+  }
+
   function upRecent(r) {
+    var down = upKindOf(r) === 'Downgrade';
     var badge = r.status === 'Approved' ? '<span class="badge badge--ok">Approved</span>'
       : r.status === 'Rejected' ? '<span class="badge badge--bad">Rejected</span>'
       : '<span class="badge badge--neutral">' + esc(r.status) + '</span>';
-    var money = (r.status === 'Approved' && r.approvedAmount != null) ? ' &middot; collected ' + upMoney(r.approvedAmount) : '';
+    var money = (!down && r.status === 'Approved' && r.approvedAmount != null) ? ' &middot; collected ' + upMoney(r.approvedAmount) : '';
+    var why = (r.reason || r.reasonNote)
+      ? '<span class="uq-rr"><b>Reason:</b> ' + esc(r.reason || '\u2014') + (r.reasonNote ? ' \u2014 ' + esc(r.reasonNote) : '') + '</span>' : '';
     return '<div class="uq-recent">' +
-      '<div><b>' + esc(r.fullName || '—') + '</b> <span class="uq-id">' + esc(r.studentId) + '</span> &middot; ' +
-        esc(r.fromTier) + ' &rarr; ' + esc(r.toTier) + money +
+      '<div><b>' + esc(r.fullName || '\u2014') + '</b> <span class="uq-id">' + esc(r.studentId) + '</span> &middot; ' +
+        esc(r.fromTier) + ' &rarr; ' + esc(r.toTier) + money + why +
         (r.adminNote ? '<small>Note: ' + esc(r.adminNote) + '</small>' : '') + '</div>' +
       '<div style="text-align:right;">' + badge + '<small>' + esc(fmtDate(r.decidedAt || r.requestedAt)) + '</small></div>' +
     '</div>';
   }
 
+  function upCardsHtml() {
+    var st = upData.stats || {};
+    function card(kind, title, arrow, cls) {
+      var pend = upData.pending.filter(function (r) { return upKindOf(r) === kind; }).length;
+      var tot = (kind === 'Upgrade' ? st.upgrades : st.downgrades) || {};
+      var on = upKind === kind;
+      return '<button type="button" class="pc-card ' + cls + (on ? ' is-on' : '') + '" data-act="pc-pick" data-kind="' + kind + '" aria-pressed="' + (on ? 'true' : 'false') + '">' +
+        '<span class="pc-card__top"><span class="pc-card__name">' + arrow + ' ' + title + '</span>' +
+          '<span class="pc-card__n' + (pend ? '' : ' pc-card__n--zero') + '">' + pend + '</span></span>' +
+        '<span class="pc-card__sub">' + (pend ? pend + ' waiting for approval' : 'Nothing waiting') + '</span>' +
+        '<span class="pc-card__sub">' + (Number(tot.approved) || 0) + ' approved in total &middot; ' + (Number(tot.thisMonth) || 0) + ' this month</span>' +
+      '</button>';
+    }
+    return card('Upgrade', 'Upgrades', '&uarr;', 'pc-card--up') + card('Downgrade', 'Downgrades', '&darr;', 'pc-card--down');
+  }
+
   function renderUpgrades() {
     var host = qs('#up-list'); if (!host) return;
-    var p = upData.pending, rc = upData.recent;
-    var html = '<div class="stu-sec">Waiting for approval (' + p.length + ')</div>';
-    html += p.length ? p.map(upPending).join('')
-      : '<p class="muted">No upgrade requests waiting right now.</p>';
-    html += '<div class="stu-sec" style="margin-top:20px;">Recent decisions</div>';
-    html += rc.length ? rc.map(upRecent).join('') : '<p class="muted">Nothing decided yet.</p>';
+    var cards = qs('#up-cards'); if (cards) cards.innerHTML = upCardsHtml();
+    var kind = upKind || 'Upgrade', word = kind === 'Upgrade' ? 'upgrade' : 'downgrade';
+    var p = upData.pending.filter(function (r) { return upKindOf(r) === kind; })
+      .sort(function (a, b) { return upTime(b.requestedAt) - upTime(a.requestedAt); });          // newest on top
+    var rc = upData.recent.filter(function (r) { return upKindOf(r) === kind; })
+      .sort(function (a, b) { return upTime(b.decidedAt || b.requestedAt) - upTime(a.decidedAt || a.requestedAt); });
+    var html = '<div class="stu-sec">Waiting for approval \u2014 ' + word + 's (' + p.length + ')</div>';
+    html += p.length ? p.map(kind === 'Upgrade' ? upPendingUp : upPendingDown).join('')
+      : '<p class="muted">No ' + word + ' requests waiting right now.</p>';
+    html += '<div class="stu-sec" style="margin-top:20px;">History \u2014 ' + word + 's (' + rc.length + ')</div>';
+    html += rc.length ? rc.map(upRecent).join('') : '<p class="muted">No ' + word + ' has been decided yet.</p>';
     host.innerHTML = html;
   }
 
@@ -4109,19 +4278,26 @@ window.WHAAdminRecheckBridge = {
 
   function upApprove(id, btn) {
     var r = upFindReq(id), card = upCardOf(id); if (!r || !card) return;
+    var down = upKindOf(r) === 'Downgrade';
     var amtEl = card.querySelector('[data-uq-amt]'), noteEl = card.querySelector('[data-uq-note]');
-    var raw = amtEl ? String(amtEl.value).trim() : '';
-    if (raw === '' || isNaN(Number(raw)) || Number(raw) < 0 || Math.floor(Number(raw)) !== Number(raw)) {
-      toast('Type the amount you collected (use 0 if nothing was collected).', 'warn'); if (amtEl) amtEl.focus(); return;
+    var amount = 0;
+    if (!down) {
+      var raw = amtEl ? String(amtEl.value).trim() : '';
+      if (raw === '' || isNaN(Number(raw)) || Number(raw) < 0 || Math.floor(Number(raw)) !== Number(raw)) {
+        toast('Type the amount you collected (use 0 if nothing was collected).', 'warn'); if (amtEl) amtEl.focus(); return;
+      }
+      amount = Number(raw);
     }
-    var amount = Number(raw);
-    var msg = 'Approve ' + r.toTier + ' for ' + (r.fullName || r.studentId) + '?\n\n' +
-      'Amount collected: ' + upMoney(amount) + '\nNew monthly fee from next month: ' + upMoney(r.newFee) +
-      '\n\nTheir new features open at once and they are notified.';
+    var msg = down
+      ? 'Move ' + (r.fullName || r.studentId) + ' to ' + r.toTier + '?\n\nTheir plan changes right now (they lose the higher-plan features at once).\n' +
+        'Nothing is collected. Their new monthly fee ' + upMoney(r.newFee) + ' starts ' + upFrom(r) + '.\n\nThey are notified.'
+      : 'Approve ' + r.toTier + ' for ' + (r.fullName || r.studentId) + '?\n\n' +
+        'Amount collected: ' + upMoney(amount) + '\nNew monthly fee from ' + upFrom(r) + ': ' + upMoney(r.newFee) +
+        '\n\nTheir new features open at once and they are notified.';
     if (!window.confirm(msg)) return;
     busy(btn, true);
     authed('admin/approveUpgrade', { requestId: id, amount: amount, note: noteEl ? noteEl.value.trim() : '' })
-      .then(function () { toast('Approved — ' + (r.fullName || 'student') + ' is now on ' + r.toTier + '.', 'ok'); upAfterChange(); })
+      .then(function () { toast((down ? 'Moved \u2014 ' : 'Approved \u2014 ') + (r.fullName || 'student') + ' is now on ' + r.toTier + '.', 'ok'); upAfterChange(); })
       .catch(function (e) { busy(btn, false); fail(e, 'Could not approve this request.'); if (e && /already handled/i.test(e.message || '')) loadUpgrades(); });
   }
 
@@ -4142,6 +4318,7 @@ window.WHAAdminRecheckBridge = {
       var b = e.target.closest ? e.target.closest('[data-act]') : null; if (!b) return;
       var a = b.getAttribute('data-act');
       if (a === 'up-refresh') return loadUpgrades();
+      if (a === 'pc-pick') { upKind = b.getAttribute('data-kind') === 'Downgrade' ? 'Downgrade' : 'Upgrade'; return renderUpgrades(); }
       if (a === 'up-approve') return upApprove(b.getAttribute('data-id'), b);
       if (a === 'up-reject') return upReject(b.getAttribute('data-id'), b);
     });
@@ -4353,16 +4530,9 @@ window.WHAAdminRecheckBridge = {
       var clsEl = ed.querySelector('[data-field="classLevel"]');
       if (dyn2) dyn2.innerHTML = edDynamicHtml(clsEl ? clsEl.value : 6, edCurrentFromForm(ed));
     } else if (f === 'plan') {
-      var clsSel = ed.querySelector('[data-field="classLevel"]');
-      var band = edBandName(clsSel ? clsSel.value : 6);
-      var row = ENROLL.plans[band].filter(function (p) { return p[0] === t.value; })[0];
-      var ps = ed.querySelector('[data-field="planPrice"]');
-      if (row && ps) {
-        // Middle: all 5 subjects ticked -> flat price, otherwise per-subject price. Matric/Inter: per-subject.
-        var nSub = ed.querySelectorAll('[data-subject]:checked').length;
-        var useFlat = (band !== 'Middle') || nSub >= ENROLL.subjectsMiddle.length || nSub === 0;
-        ps.value = String(useFlat ? row[1] : row[2]);
-      }
+      edUpdateFee(ed);                       // the fee follows the chosen plan, for this class only
+    } else if (t.hasAttribute && t.hasAttribute('data-subject')) {
+      edUpdateFee(ed);                       // ...and the number of ticked subjects
     }
   });
 

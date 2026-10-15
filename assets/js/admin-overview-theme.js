@@ -243,6 +243,20 @@
         </article>
       </div>
 
+      <div class="wha-admin-plan-row" style="margin-bottom:16px">
+        <article class="wha-admin-dash-card wha-admin-plan-card">
+          <div class="wha-admin-card-head">
+            <div>
+              <span class="wha-admin-eyebrow">Plans</span>
+              <h2>Plan changes</h2>
+              <p id="wha-plan-summary" class="wha-admin-card-subtitle">Students moving between Basic, Plus and Max.</p>
+            </div>
+            <span class="wha-admin-live-dot">Live</span>
+          </div>
+          <div id="wha-plan-changes" style="display:grid;grid-template-columns:repeat(auto-fit,minmax(280px,1fr));gap:24px"><p class="wha-admin-muted">Loading…</p></div>
+        </article>
+      </div>
+
       <div class="wha-admin-secondary-grid">
         <article class="wha-admin-dash-card">
           <div class="wha-admin-card-head">
@@ -274,7 +288,7 @@
           </div>
           <div class="wha-admin-quick-actions">
             ${quick('Students')}${quick('Teachers')}${quick('Boss Papers')}
-            ${quick('Rechecking')}${quick('Analytics')}
+            ${quick('Rechecking')}${quick('Analytics')}${quick('Plan Changes')}
             <button type="button" data-open-theme>Theme<span>→</span></button>
           </div>
         </article>
@@ -296,7 +310,11 @@
     o.querySelector('#wha-overview-date').textContent=new Intl.DateTimeFormat(undefined,{weekday:'short',day:'numeric',month:'short',year:'numeric'}).format(new Date());
     o.querySelector('#wha-overview-refresh').addEventListener('click',load);
     o.querySelector('[data-open-theme]').addEventListener('click',()=>{const m=modal();m.hidden=false;apply(saved());});
-    o.querySelectorAll('[data-quick]').forEach(b=>b.addEventListener('click',()=>nav(b.dataset.quick)?.click()));
+    o.querySelectorAll('[data-quick]').forEach(b=>b.addEventListener('click',()=>{
+      // The Plan Changes tab carries a live count badge, so its label never matches by text: open it by its view name.
+      const el=b.dataset.quick==='Plan Changes'?document.querySelector('.wha-admin-sidebar [data-view="upgrades"]'):nav(b.dataset.quick);
+      el?.click();
+    }));
     o.querySelectorAll('[data-activity-range]').forEach(btn=>btn.addEventListener('click',()=>{
       activityState.range=btn.dataset.activityRange||'daily';
       syncActivityTabs();
@@ -321,6 +339,38 @@
     h.innerHTML=rows.map(([k,v])=>`<div><span><i class="status-${String(k).toLowerCase().replace(/[^a-z0-9]+/g,'-')}"></i>${esc(k)}</span><strong>${num(v)}</strong></div>`).join('');
   }
 
+
+  // Plan changes: how many students moved between plans (approved requests), plus what is waiting.
+  function renderPlanChanges(data){
+    const h=document.getElementById('wha-plan-changes'); if(!h)return;
+    const sum=document.getElementById('wha-plan-summary');
+    const st=data&&data.stats;
+    if(!st||!Array.isArray(st.paths)){
+      h.innerHTML='<p class="wha-admin-muted">Plan change numbers are not available yet.</p>';
+      return;
+    }
+    const paths=st.paths;
+    const max=Math.max(1,...paths.map(p=>num(p.approved)));
+    const group=(kind,title,tot,color)=>{
+      tot=tot||{};
+      const rows=paths.filter(p=>p.kind===kind).map(p=>{
+        const a=num(p.approved), w=a?Math.max(4,Math.round(a/max*100)):0;
+        const extra=`${num(p.thisMonth)} this month`+(num(p.pending)?` · ${num(p.pending)} waiting`:'');
+        return `<div class="wha-admin-plan-path"><div class="wha-admin-class-row" style="grid-template-columns:122px 1fr 34px" title="${esc(extra)}">`+
+          `<span>${esc(p.from)} → ${esc(p.to)}</span><div><i style="width:${w}%;background:${color}"></i></div><strong>${a}</strong></div>`+
+          `<small class="wha-admin-muted" style="display:block;margin:3px 0 0 132px;font-size:11px">${esc(extra)}</small></div>`;
+      }).join('');
+      return `<div class="wha-admin-plan-group" data-plan-kind="${kind}">`+
+        `<div style="display:flex;justify-content:space-between;align-items:baseline;gap:8px;flex-wrap:wrap;margin-bottom:12px"><strong>${title}</strong>`+
+        `<span class="wha-admin-muted" style="font-size:12px">${num(tot.approved)} approved · ${num(tot.thisMonth)} this month · ${num(tot.pending)} waiting</span></div>`+
+        `<div class="wha-admin-class-bars">${rows}</div></div>`;
+    };
+    h.innerHTML=group('Upgrade','Upgrades',st.upgrades,'linear-gradient(90deg,var(--wa-primary),var(--wa-primary-2))')+
+      group('Downgrade','Downgrades',st.downgrades,'linear-gradient(90deg,var(--wa-warn,#f59e0b),#fb923c)');
+    const waiting=num(st.upgrades&&st.upgrades.pending)+num(st.downgrades&&st.downgrades.pending);
+    if(sum)sum.textContent=`${num(st.upgrades&&st.upgrades.approved)+num(st.downgrades&&st.downgrades.approved)} plan changes approved in total`+
+      (waiting?` · ${waiting} waiting for you`:'');
+  }
 
   const activityState={range:'daily',trend:[]};
   const ACTIVITY_RANGE_LABELS={daily:'Daily',weekly:'Weekly',monthly:'Monthly',yearly:'Yearly',lifetime:'Lifetime'};
@@ -636,6 +686,7 @@
     const st=document.getElementById('wha-system-status');
     if(st){st.className='wha-admin-system-status';st.innerHTML='<span></span>Refreshing Admin data…';}
 
+    const planP=call('admin/listUpgradeRequests',{}).then(r=>r,()=>null);
     const results=await Promise.allSettled([
       call('admin/statistics'),
       call('admin/listTeachers'),
@@ -662,6 +713,7 @@
     renderRecentActions(teachers,papers,rechecks);
     renderClasses(stats.byClassLevel||{});
     renderStatuses(stats.byStatus||{});
+    renderPlanChanges(await planP);
 
     const failed=results.filter(r=>r.status==='rejected').length;
     if(st){
@@ -677,6 +729,21 @@
     const ov=nav('Overview'); if(!ov)return;
     if(!ov.dataset.whaOverviewWired){ov.dataset.whaOverviewWired='1';ov.addEventListener('click',()=>setTimeout(show,0));}
     NAV.filter(x=>x!=='Overview').forEach(x=>{const e=nav(x);if(e&&!e.dataset.whaOverviewHide){e.dataset.whaOverviewHide='1';e.addEventListener('click',hide);}});
+    // Tabs that are not in NAV (Plan Changes, Archived) used to leave the Overview covering the page when clicked.
+    const sb=sidebar();
+    if(sb)sb.querySelectorAll('[data-view]').forEach(e=>{
+      if(e.dataset.view!=='overview'&&!e.dataset.whaOverviewHide){e.dataset.whaOverviewHide='1';e.addEventListener('click',hide);}
+    });
+    // Plan Changes and Archived are not in the staff-shell tab list, so they kept the plain look. Give them the same look
+    // as the other tabs, and keep ONE highlighted tab at a time (clear every tab, then mark the clicked one).
+    if(sb){
+      const items=Array.from(sb.querySelectorAll('[data-view]'));
+      items.forEach(e=>{if(!e.dataset.whaStaffNav)e.dataset.whaStaffNav=norm(e.textContent);});
+      items.forEach(e=>{
+        if(e.dataset.whaExtraWired)return; e.dataset.whaExtraWired='1';
+        e.addEventListener('click',()=>{items.forEach(x=>delete x.dataset.whaActive);e.dataset.whaActive='true';});
+      });
+    }
   }
   function boot(){
     if(!sidebar())return false;
