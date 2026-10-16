@@ -1892,7 +1892,20 @@ window.WHAAdminRecheckBridge = {
   function edUpdateFee(ed){
     var slot = ed.querySelector('[data-fee-slot]'); if (!slot) return;
     var cls = ed.querySelector('[data-field="classLevel"]'), plan = ed.querySelector('[data-field="plan"]');
-    slot.innerHTML = edFeeInner(edBandName(cls ? cls.value : 6), plan ? plan.value : '', ed.querySelectorAll('[data-subject]:checked').length, null);
+    var ticked = Array.prototype.map.call(ed.querySelectorAll('[data-subject]:checked'), function(c){ return c.value; });
+    slot.innerHTML = edFeeInner(edBandName(cls ? cls.value : 6), plan ? plan.value : '', edFeeCount(ed, cls ? cls.value : 6, ticked), null);
+  }
+  // An account whose scope is FULL-Cxx opens EVERY subject of its class (older accounts), so its fee is the
+  // all-subjects fee whatever the short subject list on the enrollment form says. Same numbers the server uses.
+  var ED_ALL_COUNT = { Middle: 5, Matric: 4, Intermediate: 2 };
+  function isFullScope(scope){ return /(^|[\s,])FULL-C\d{2}($|[\s,])/.test(String(scope || '').toUpperCase()); }
+  function edSubjKey(list){ return (list || []).map(function(x){ return String(x).trim().toLowerCase(); }).filter(Boolean).sort().join('|'); }
+  // Count to price in the edit form: the all-subjects count while an all-subjects account still has its own
+  // class and subjects ticked, otherwise just the ticked subjects.
+  function edFeeCount(ed, cls, ticked){
+    var full = Number(ed && ed.getAttribute('data-full-n')) || 0;
+    if (full && String(cls) === ed.getAttribute('data-orig-cls') && edSubjKey(ticked) === ed.getAttribute('data-orig-subs')) return full;
+    return ticked.length;
   }
   // The fee this student should be paying today, from their saved class / plan / subjects (null if unknown).
   function stuStdFee(s, fd){
@@ -1900,7 +1913,9 @@ window.WHAAdminRecheckBridge = {
     var raw = fd.planTier || fd.plan || '';
     var tier = (ENROLL.planLegacy && ENROLL.planLegacy[raw]) || raw;
     var subs = Array.isArray(fd.subjects) ? fd.subjects : (fd.subjects ? String(fd.subjects).split(',').map(function(x){ return x.trim(); }).filter(Boolean) : []);
-    var f = edFee(edBandName(cls), tier, subs.length);
+    var n = subs.length;
+    if (isFullScope(s.enrolledScope || fd.enrolledScope)) n = ED_ALL_COUNT[edBandName(cls)] || n;   // dashboard opens every subject
+    var f = edFee(edBandName(cls), tier, n);
     return f ? f.total : null;
   }
 
@@ -1926,7 +1941,9 @@ window.WHAAdminRecheckBridge = {
     var curPlan = (ENROLL.planLegacy && ENROLL.planLegacy[cur.plan]) || cur.plan;   // old Starter/Pro/Advanced -> Basic/Plus/Max
     var planOpts = '<option value="">\u2014 Select \u2014</option>' +
       rows.map(function(p){ return '<option value="'+p[0]+'"'+(p[0]===curPlan?' selected':'')+'>'+p[0]+'</option>'; }).join('');
-    var nChecked = allSubs.filter(function(x){ return chosen[x.toLowerCase()]; }).length;
+    var tickedNow = allSubs.filter(function(x){ return chosen[x.toLowerCase()]; });
+    var nChecked = tickedNow.length;
+    if (cur.fullAll && String(cls) === String(cur.origCls) && edSubjKey(tickedNow) === cur.origSubs) nChecked = cur.fullAll;   // all-subjects account, untouched
     var planHtml = '<label class="stu-edit__row"><span class="stu-edit__lbl">Plan</span><select class="input" data-field="plan">'+planOpts+'</select></label>'+
       '<div class="stu-edit__row"><span class="stu-edit__lbl">Monthly fee</span><div data-fee-slot>'+edFeeInner(band, curPlan, nChecked, cur.savedFee)+'</div></div>';
     return streamHtml + subsHtml + planHtml;
@@ -1934,7 +1951,8 @@ window.WHAAdminRecheckBridge = {
   function edCurrentFromForm(ed){
     function v(f){ var el=ed.querySelector('[data-field="'+f+'"]'); return el?el.value:''; }
     var subs = Array.prototype.map.call(ed.querySelectorAll('[data-subject]:checked'), function(c){ return c.value; });
-    return { stream:v('stream'), plan:v('plan'), subjects:subs };
+    return { stream:v('stream'), plan:v('plan'), subjects:subs,
+             fullAll:Number(ed.getAttribute('data-full-n')) || 0, origCls:ed.getAttribute('data-orig-cls'), origSubs:ed.getAttribute('data-orig-subs') };
   }
 
   function stuEditForm(s, key){
@@ -1947,15 +1965,19 @@ window.WHAAdminRecheckBridge = {
     if (cls < 6) cls = 6; if (cls > 12) cls = 12;
     var subjects = Array.isArray(fd.subjects) ? fd.subjects
       : (fd.subjects ? String(fd.subjects).split(',').map(function(x){return x.trim();}).filter(Boolean) : []);
-    var cur = { stream: fd.stream||'', subjects: subjects, plan: fd.plan||fd.planTier||'', savedFee: fd.planPrice };
+    var fullAll = isFullScope(s.enrolledScope || fd.enrolledScope) ? (ED_ALL_COUNT[edBandName(cls)] || 0) : 0;
+    var origSubs = edSubjKey(subjects);
+    var cur = { stream: fd.stream||'', subjects: subjects, plan: fd.plan||fd.planTier||'', savedFee: fd.planPrice,
+                fullAll: fullAll, origCls: String(cls), origSubs: origSubs };
 
     var classOpts = '';
     for (var c=6;c<=12;c++){ classOpts += '<option value="'+c+'"'+(c===cls?' selected':'')+'>Class '+c+'</option>'; }
     var tuitOpts = '<option value=""'+(!fd.tuitionMode?' selected':'')+'>\u2014 Select \u2014</option>' +
       ENROLL.tuition.map(function(t){ return '<option'+(t===(fd.tuitionMode||'')?' selected':'')+'>'+esc(t)+'</option>'; }).join('');
 
-    var html = '<div class="stu-edit">' +
-      '<p class="stu-edit__hint">Same fields as the enrollment form. Changing Class updates Stream, Subjects and Plan for that level. Changing Subjects or Class updates which games this student can play. The monthly fee is worked out for you from the class, plan and number of subjects, using the pricing-page prices.</p>';
+    var html = '<div class="stu-edit" data-full-n="' + fullAll + '" data-orig-cls="' + esc(String(cls)) + '" data-orig-subs="' + esc(origSubs) + '">' +
+      '<p class="stu-edit__hint">Same fields as the enrollment form. Changing Class updates Stream, Subjects and Plan for that level. Changing Subjects or Class updates which games this student can play. The monthly fee is worked out for you from the class, plan and number of subjects, using the pricing-page prices.</p>' +
+      (fullAll ? '<p class="stu-edit__hint"><b>All-subjects account.</b> This student\u2019s dashboard opens every subject of the class, so the all-subjects fee applies. Leave Class and Subjects as they are to keep it that way. Changing them limits the dashboard to the ticked subjects.</p>' : '');
     html += txt('fullName','Full name', s.fullName || fd.fullName || '');
     html += txt('email','Email', s.email || fd.email || '');
     html += '<label class="stu-edit__row"><span class="stu-edit__lbl">Class</span><select class="input" data-field="classLevel">'+classOpts+'</select></label>';
