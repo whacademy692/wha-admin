@@ -529,7 +529,8 @@ select.input { appearance: auto; background: var(--surface); }
 .stu-dl dd { margin: 0; font-size: .9rem; word-break: break-word; }
 .stu-sec { font-size: .72rem; font-weight: 800; letter-spacing: .06em; text-transform: uppercase; color: var(--muted,#9ca3af); margin: 14px 0 2px; }
 @media (max-width: 560px){ .stu-head{flex-wrap:wrap} .stu-dl{grid-template-columns:1fr} .stu-dl dt{margin-top:6px} }
-.stu-body__acts { display:flex; justify-content:flex-end; margin-top:10px; }
+.stu-body__acts { display:flex; justify-content:flex-end; flex-wrap:wrap; gap:6px; margin-top:10px; }
+.stu-body__acts a.btn { text-decoration:none; }
 .stu-edit { display:flex; flex-direction:column; gap:10px; margin-top:10px; }
 .stu-edit__hint { font-size:.8rem; color:var(--muted,#6b7280); margin:0 0 4px; line-height:1.5; }
 .stu-edit__row { display:grid; grid-template-columns:170px 1fr; align-items:center; gap:10px; }
@@ -1753,7 +1754,22 @@ window.WHAAdminRecheckBridge = {
     if (typeof v === 'object') { try { return JSON.stringify(v); } catch(e){ return '—'; } }
     var t = String(v); return t.trim() ? t : '—';
   }
-  var STU_HIDE_KEYS = { fullName:1, email:1, source:1, submittedAtLocal:1 };
+  var STU_HIDE_KEYS = { fullName:1, email:1, source:1, submittedAtLocal:1, whatsapp:1 };
+
+  // WhatsApp: numbers are stored as +923001234567; wa.me wants the digits only.
+  function waDigits(v){ return String(v || '').replace(/\D/g, ''); }
+  function waLink(v, text){ var d = waDigits(v); return d ? 'https://wa.me/' + d + (text ? '?text=' + encodeURIComponent(text) : '') : ''; }
+  // Ready-to-send message. For a student whose fee is not confirmed yet it is the fee reminder.
+  function stuWaMessage(s, fd){
+    var name = s.fullName || fd.fullName || 'your child';
+    if (String(s.status || '') === 'Pending') {
+      var fee = stuStdFee(s, fd), plan = fd.planTier || fd.plan || '';
+      var what = plan ? ' (' + (fd.classLevel ? 'Class ' + fd.classLevel + ', ' : '') + plan + ' plan' + (fee ? ', PKR ' + fee.toLocaleString() + ' per month' : '') + ')' : '';
+      return 'Assalam o Alaikum, this is W.H. Academy. We received the enrollment form for ' + name + what +
+        ', but the fee has not been confirmed yet, so the account is not active. Please reply here and we will share the payment details. If you have already paid, please send the payment screenshot. JazakAllah.';
+    }
+    return 'Assalam o Alaikum, this is W.H. Academy regarding ' + name + '.';
+  }
 
   function stuBodyInner(s){
     var sid = String(s.studentId || '').trim();
@@ -1763,6 +1779,10 @@ window.WHAAdminRecheckBridge = {
       : '<span class="dot dot--warn">No account yet</span>';
     var base = '';
     base += '<dt>Email</dt><dd>' + esc(s.email || '—') + '</dd>';
+    var waNum = (s.formData && typeof s.formData === 'object') ? s.formData.whatsapp : '';
+    base += '<dt>WhatsApp</dt><dd>' + (waLink(waNum)
+      ? '<a href="' + esc(waLink(waNum)) + '" target="_blank" rel="noopener">' + esc(waNum) + '</a>'
+      : '<span class="muted">Not given \u2014 add it with Edit details</span>') + '</dd>';
     base += '<dt>Account</dt><dd>' + account + '</dd>';
     base += '<dt>Scope</dt><dd>' + esc(s.enrolledScope || '—') + '</dd>';
     base += '<dt>Submitted</dt><dd>' + fmtDate(s.submittedAt) + '</dd>';
@@ -1784,6 +1804,8 @@ window.WHAAdminRecheckBridge = {
     return '<div class="stu-body__acts">' +
         '<button class="btn btn--secondary btn--sm" data-act="stu-edit" data-key="' + esc(key) + '">Edit details</button> ' +
         '<button class="btn btn--quiet btn--sm" data-act="stu-voucher" data-key="' + esc(key) + '">Fee voucher</button>' +
+        (waLink(waNum) ? ' <a class="btn btn--secondary btn--sm" data-wa href="' + esc(waLink(waNum, stuWaMessage(s, fd))) + '" target="_blank" rel="noopener" title="Opens WhatsApp with a ready message">' +
+          (String(s.status || '') === 'Pending' ? 'WhatsApp: fee reminder' : 'WhatsApp') + '</a>' : '') +
       '</div>' +
       '<dl class="stu-dl">' + base + '</dl>' +
       (extra ? '<div class="stu-sec">Enrollment form</div><dl class="stu-dl">' + extra + '</dl>' : '');
@@ -1980,11 +2002,12 @@ window.WHAAdminRecheckBridge = {
       (fullAll ? '<p class="stu-edit__hint"><b>All-subjects account.</b> This student\u2019s dashboard opens every subject of the class, so the all-subjects fee applies. Leave Class and Subjects as they are to keep it that way. Changing them limits the dashboard to the ticked subjects.</p>' : '');
     html += txt('fullName','Full name', s.fullName || fd.fullName || '');
     html += txt('email','Email', s.email || fd.email || '');
+    html += txt('whatsapp','WhatsApp number', fd.whatsapp || '', 'tel');
     html += '<label class="stu-edit__row"><span class="stu-edit__lbl">Class</span><select class="input" data-field="classLevel">'+classOpts+'</select></label>';
     html += '<label class="stu-edit__row"><span class="stu-edit__lbl">Tuition mode</span><select class="input" data-field="tuitionMode">'+tuitOpts+'</select></label>';
     html += '<div class="ed-dynamic">'+edDynamicHtml(cls, cur)+'</div>';
 
-    var handled = {fullName:1,email:1,classLevel:1,tuitionMode:1,stream:1,subjects:1,plan:1,planTier:1,planPrice:1,classBand:1,source:1,submittedAtLocal:1};
+    var handled = {fullName:1,email:1,whatsapp:1,classLevel:1,tuitionMode:1,stream:1,subjects:1,plan:1,planTier:1,planPrice:1,classBand:1,source:1,submittedAtLocal:1};
     ['fatherName','fatherOccupation','schoolName','address','otherSubject'].forEach(function(k){ html += txt(k, prettyKey(k), fmtPlain(fd[k])); handled[k]=1; });
     Object.keys(fd).forEach(function(k){ if (handled[k]) return; html += txt(k, prettyKey(k), fmtPlain(fd[k])); });
 
