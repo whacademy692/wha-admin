@@ -320,6 +320,15 @@ th:first-child, td:first-child { min-width: 15rem; }
 }
 .tile__value { font-size: 1.75rem; font-weight: 700; line-height: 1.1; color: var(--brand-deep); font-variant-numeric: tabular-nums; }
 .tile__label { font-size: 0.8125rem; color: var(--muted); }
+/* Clickable "Pending fee" overview tile + Students toolbar shortcut */
+.tile--act { cursor: pointer; text-align: left; font: inherit; transition: box-shadow .16s, border-color .16s, transform .12s; }
+.tile--act:hover { border-color: #f59e0b; box-shadow: 0 8px 22px rgba(245,158,11,.18); transform: translateY(-1px); }
+.tile--pending { border-color: #fcd34d; background: #fffbeb; }
+.tile--pending .tile__value { color: #b45309; }
+.tile--pending .tile__label { color: #92400e; font-weight: 600; }
+.feepend-btn { display: inline-flex; align-items: center; gap: .4rem; border: 1px solid #fcd34d; background: #fffbeb; color: #92400e; font-weight: 700; border-radius: 10px; padding: .4rem .75rem; cursor: pointer; font-size: .85rem; }
+.feepend-btn:hover { border-color: #f59e0b; background: #fef3c7; }
+.feepend-btn.is-on { border-color: #b45309; box-shadow: 0 0 0 1px #b45309 inset; }
 
 .panel { padding: 1rem; background: var(--surface); border: 1px solid var(--line); border-radius: var(--r-md); }
 .panel__title { margin: 0 0 0.75rem; font-size: 0.875rem; font-weight: 600; color: var(--ink-soft); }
@@ -1005,6 +1014,7 @@ select.input { appearance: auto; background: var(--surface); }
           <option value="suspended">Suspended</option>
           <option value="expired">Expired</option>
         </select>
+        <button class="feepend-btn" type="button" data-act="go-pending-fee" id="feepend-btn" title="Show only enrolments waiting for fee confirmation — each has a WhatsApp reminder button" hidden>&#9203; Fee pending</button>
       </div>
 
       <style>#results .promo-check{display:none} #results.wha-selmode .promo-check{display:inline-block}</style>
@@ -1699,7 +1709,19 @@ window.WHAAdminRecheckBridge = {
     }
 
     var tiles = tile(stats.totalEnrollments || 0, 'Total enrolled');
-    Object.keys(merged).sort().forEach(function (s) { tiles += tile(merged[s], s); });
+    Object.keys(merged).sort().forEach(function (s) {
+      // The "Pending" tile = enrolments waiting for fee confirmation. Make it a
+      // one-click shortcut into the Students list, pre-filtered, where each row
+      // already carries a WhatsApp fee-reminder button.
+      if (s === 'Pending' && merged[s] > 0) {
+        tiles += '<button type="button" class="tile tile--act tile--pending" data-act="go-pending-fee" ' +
+          'title="See the fee-pending list and send WhatsApp reminders">' +
+          '<span class="tile__value">' + esc(merged[s]) + '</span>' +
+          '<span class="tile__label">Pending fee &rarr;</span></button>';
+      } else {
+        tiles += tile(merged[s], s);
+      }
+    });
 
     var rows = Object.keys(byClass).sort(function (a, b) {
       // Numeric sort, so Class 9 comes before Class 10 rather than after it.
@@ -2185,6 +2207,7 @@ window.WHAAdminRecheckBridge = {
       stuPage = 1;
     }
     if (!Array.isArray(results)) results = [];
+    updateFeePendBtn();
 
     if (!results.length) {
       host.innerHTML = '<div class="empty"><h2>No students matched</h2><p>' +
@@ -2276,6 +2299,34 @@ window.WHAAdminRecheckBridge = {
       return normalizeStatus(s.status).toLowerCase() === f;
     });
   }
+  // ---- "Fee pending" one-click shortcut (Pending = fee not confirmed yet) ----
+  function pendingFeeCount() {
+    return (results || []).filter(function (s) {
+      return normalizeStatus(s.status).toLowerCase() === 'pending';
+    }).length;
+  }
+  function updateFeePendBtn() {
+    var b = qs('#feepend-btn'); if (!b) return;
+    var n = pendingFeeCount();
+    b.hidden = n === 0;
+    b.innerHTML = '&#9203; Fee pending (' + n + ')';
+    b.classList.toggle('is-on', currentFilter() === 'pending');
+  }
+  function scrollResults() {
+    var h = qs('#results'); if (!h) return;
+    try { h.scrollIntoView({ behavior: 'smooth', block: 'start' }); } catch (e) {}
+  }
+  function goPendingFee() {
+    showView('students');
+    var f = qs('#f-filter'); if (f) f.value = 'pending';
+    stuPage = 1;
+    var done = function () { renderResults(); scrollResults(); };
+    // The list is loaded when the console opens; if it isn't (e.g. jumped
+    // straight here), pull it first, then filter.
+    if (results && results.length) done();
+    else runSearch('', null).then(done);
+  }
+
   function selectedKeys() {
     return qsa('.row-cb').filter(function (c) { return c.checked; }).map(function (c) { return c.dataset.key; });
   }
@@ -4600,6 +4651,7 @@ window.WHAAdminRecheckBridge = {
     if (t.dataset.act === 'restore') restoreArchive(t.dataset.arch);
     if (t.dataset.act === 'purge') purgeArchive(t.dataset.arch);
     if (t.dataset.act === 'refresh-archived') loadArchived();
+    if (t.dataset.act === 'go-pending-fee') { goPendingFee(); return; }
     if (t.dataset.view) {
       showView(t.dataset.view);
       if (t.dataset.view === 'grading') loadGrading();
