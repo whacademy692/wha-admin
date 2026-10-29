@@ -945,6 +945,11 @@ select.input { appearance: auto; background: var(--surface); }
         Plan Changes
         <span class="nav-badge" id="up-badge" hidden></span>
       </button>
+      <button class="side__item" data-view="fees" type="button">
+        <svg viewBox="0 0 24 24" stroke-width="2" aria-hidden="true"><rect x="2" y="6" width="20" height="12" rx="2"/><circle cx="12" cy="12" r="2.5"/><path stroke-linecap="round" d="M6 12h.01M18 12h.01"/></svg>
+        Fees
+        <span class="nav-badge" id="fees-badge" hidden></span>
+      </button>
       <button class="side__item" data-view="papers" type="button">
         <svg viewBox="0 0 24 24" stroke-width="2" aria-hidden="true"><path stroke-linecap="round" stroke-linejoin="round" d="M12 3l7 3v5c0 4.5-3 7.5-7 9-4-1.5-7-4.5-7-9V6l7-3z"/><path stroke-linecap="round" stroke-linejoin="round" d="M9.5 12l1.8 1.8L15 9.8"/></svg>
         Boss Papers
@@ -1055,6 +1060,18 @@ select.input { appearance: auto; background: var(--surface); }
         <button class="btn btn--quiet btn--sm" data-act="refresh-archived" type="button">Refresh</button>
       </header>
       <div id="archived-results" aria-live="polite"></div>
+    </section>
+
+    <section data-panel="fees" hidden>
+      <header class="head">
+        <div>
+          <h1 class="head__title">Fees</h1>
+          <p class="head__sub">Who is blocked for an unpaid month, and the fee structure. Mark a student&rsquo;s month paid from their card in the Students tab (&ldquo;Monthly fee&rdquo;).</p>
+        </div>
+        <button class="btn btn--quiet btn--sm" data-act="fees-refresh" type="button">Refresh</button>
+      </header>
+      <div id="fees-blocked" aria-live="polite"></div>
+      <div id="fees-structure" style="margin-top:28px"></div>
     </section>
 
     <section data-panel="overview" hidden>
@@ -1825,6 +1842,7 @@ window.WHAAdminRecheckBridge = {
     });
     return '<div class="stu-body__acts">' +
         '<button class="btn btn--secondary btn--sm" data-act="stu-edit" data-key="' + esc(key) + '">Edit details</button> ' +
+        (sid ? '<button class="btn btn--primary btn--sm" data-act="fee-open" data-key="' + esc(sid) + '">Monthly fee</button> ' : '') +
         '<button class="btn btn--quiet btn--sm" data-act="stu-voucher" data-key="' + esc(key) + '">Fee voucher</button>' +
         (waLink(waNum) ? ' <a class="btn btn--secondary btn--sm" data-wa href="' + esc(waLink(waNum, stuWaMessage(s, fd))) + '" target="_blank" rel="noopener" title="Opens WhatsApp with a ready message">' +
           (String(s.status || '') === 'Pending' ? 'WhatsApp: fee reminder' : 'WhatsApp') + '</a>' : '') +
@@ -2663,6 +2681,7 @@ window.WHAAdminRecheckBridge = {
     if (name === 'devices') loadDevices();
     if (name === 'papers') loadPapers();
     if (name === 'archived') loadArchived();
+    if (name === 'fees') loadFees();
   }
 
   function enterConsole(email) {
@@ -4447,11 +4466,188 @@ window.WHAAdminRecheckBridge = {
       if (a === 'stu-save') return saveStuEdit(b.dataset.key, b);
       if (a === 'stu-cancel') return cancelStuEdit(b.dataset.key);
       if (a === 'stu-voucher') return openVoucher(b.dataset.key);
+      if (a === 'fee-open') return openStuFee(b.dataset.key);
+      if (a === 'fee-back') return feeBack(b.dataset.key);
+      if (a === 'fee-paid') return feeMark(b.dataset.key, b.dataset.period, true, b);
+      if (a === 'fee-unpaid') return feeMark(b.dataset.key, b.dataset.period, false, b);
+      if (a === 'fee-online-save') return feeSaveOnline(b.dataset.key, b);
       return;
     }
     var head = e.target.closest('.stu-head');
     if (head) { var c = head.closest('.stu-card'); if (c) c.classList.toggle('is-open'); }
   });
+
+  // ==========================================================================
+  // MONTHLY FEE (v12.20) — per-student fee panel + Fees view (blocked + structure)
+  // ==========================================================================
+  function feeMoney(n){ n = Number(n) || 0; return 'PKR ' + n.toLocaleString(); }
+  function feeBadge(st){
+    return st === 'Paid'
+      ? '<span class="badge badge--ok">Paid</span>'
+      : '<span class="badge badge--warn">Pending</span>';
+  }
+  function openStuFee(sid){
+    var card = findCardByKey(sid); if (!card) return;
+    card.classList.add('is-open');
+    var body = card.querySelector('.stu-body'); if (!body) return;
+    body.innerHTML = '<p class="muted" style="padding:8px 0">Loading fee details…</p>';
+    authed('admin/fee/student', { studentId: sid })
+      .then(function(d){ body.innerHTML = renderStuFee(sid, d); })
+      .catch(function(err){
+        body.innerHTML = '<p class="bad">Could not load fees: ' + esc(err.message || 'error') + '</p>' +
+          '<button class="btn btn--quiet btn--sm" data-act="fee-back" data-key="' + esc(sid) + '">Back</button>';
+      });
+  }
+  function renderStuFee(sid, d){
+    d = d || {};
+    var months = Array.isArray(d.months) ? d.months : [];
+    var lockNote = '<p class="stu-edit__hint">Fee is due between the <b>' + d.dueFrom + '–' + d.dueTo +
+      '</b> of each month. If the current month is unpaid, the dashboard locks on the <b>' + d.lockDay +
+      'th</b>. Marking the month <b>Paid</b> restores access at once.' +
+      (d.locked ? ' <b class="bad">Locked now</b> (' + esc(d.currentLabel) + ' unpaid' +
+        (d.blockedAt ? ', since ' + fmtDate(d.blockedAt) : '') + ').' : '') + '</p>';
+    var onOn = !!d.onlineClasses;
+    var online = '<div class="fee-online" style="margin:10px 0;padding:12px;border:1px solid var(--line,#e5e7eb);border-radius:10px">' +
+      '<label style="display:flex;align-items:center;gap:8px;font-weight:600">' +
+        '<input type="checkbox" class="fee-online-on"' + (onOn ? ' checked' : '') + '> Online / live classes (Zoom, Meet)</label>' +
+      '<label class="stu-edit__row" style="margin-top:8px"><span class="stu-edit__lbl">Online fee (PKR / month)</span>' +
+        '<input class="input fee-online-amt" type="number" min="0" step="50" value="' + (Number(d.onlineFee) || 0) + '"' + (onOn ? '' : ' disabled') + '></label>' +
+      '<button class="btn btn--secondary btn--sm" data-act="fee-online-save" data-key="' + esc(sid) + '" style="margin-top:8px">Save online fee</button>' +
+      '<p class="muted" style="margin:6px 0 0;font-size:.82rem">Adds to the total for the current and future unpaid months. Paid months don’t change.</p>' +
+    '</div>';
+    var rows = months.map(function(m){
+      var mark = m.status === 'Paid'
+        ? '<button class="btn btn--quiet btn--sm" data-act="fee-unpaid" data-key="' + esc(sid) + '" data-period="' + esc(m.period) + '">Mark unpaid</button>'
+        : '<button class="btn btn--primary btn--sm" data-act="fee-paid" data-key="' + esc(sid) + '" data-period="' + esc(m.period) + '">Mark paid</button>';
+      var brk = '<span class="muted" style="font-size:.82rem">Dashboard ' + feeMoney(m.dashboardFee) +
+        (Number(m.onlineFee) > 0 ? ' + Online ' + feeMoney(m.onlineFee) : '') + '</span>';
+      return '<div class="fee-month" style="display:flex;align-items:center;justify-content:space-between;gap:10px;padding:10px 12px;border:1px solid var(--line,#e5e7eb);border-radius:10px;margin-bottom:8px">' +
+        '<div><div style="font-weight:600">' + esc(m.label) + (m.isCurrent ? ' <span class="muted">(this month)</span>' : '') + '</div>' + brk + '</div>' +
+        '<div style="display:flex;align-items:center;gap:10px"><div style="text-align:right"><div style="font-weight:700">' + feeMoney(m.totalFee) + '</div>' + feeBadge(m.status) + '</div>' + mark + '</div>' +
+      '</div>';
+    }).join('');
+    return '<div class="stu-fee">' +
+      '<div class="stu-body__acts"><button class="btn btn--quiet btn--sm" data-act="fee-back" data-key="' + esc(sid) + '">← Back to details</button></div>' +
+      lockNote + online +
+      '<div class="stu-sec">Monthly invoices</div>' +
+      (rows || '<p class="muted">No months yet.</p>') +
+    '</div>';
+  }
+  function feeBack(sid){
+    var s = findStudentByKey(sid), card = findCardByKey(sid);
+    if (!s || !card) { refresh(); return; }
+    var body = card.querySelector('.stu-body'); if (body) body.innerHTML = stuBodyInner(s);
+  }
+  function feeMark(sid, period, paid, btn){
+    busy(btn, true);
+    authed(paid ? 'admin/fee/markPaid' : 'admin/fee/markUnpaid', { studentId: sid, period: period })
+      .then(function(){ toast(paid ? 'Marked paid.' : 'Marked unpaid.', 'ok'); openStuFee(sid); })
+      .catch(function(err){ toast(err.message || 'Failed.', 'bad'); busy(btn, false); });
+  }
+  function feeSaveOnline(sid, btn){
+    var card = findCardByKey(sid); if (!card) return;
+    var on = card.querySelector('.fee-online-on'), amt = card.querySelector('.fee-online-amt');
+    var onOn = on ? on.checked : false;
+    var amount = amt ? Math.max(0, Math.floor(Number(amt.value) || 0)) : 0;
+    busy(btn, true);
+    authed('admin/fee/setOnline', { studentId: sid, onlineClasses: onOn, onlineFee: amount })
+      .then(function(){ toast('Online fee saved.', 'ok'); openStuFee(sid); })
+      .catch(function(err){ toast(err.message || 'Failed.', 'bad'); busy(btn, false); });
+  }
+  // Fees view: blocked list + fee-structure editor
+  function loadFees(){
+    var host = qs('#fees-blocked'); if (host) host.innerHTML = '<p class="muted">Loading…</p>';
+    authed('admin/fee/syncCurrent', {})
+      .then(function(){ return authed('admin/fee/blockedList', {}); })
+      .then(function(d){ renderBlocked(d); updateFeesBadge(d); })
+      .catch(function(err){ if (host) host.innerHTML = '<p class="bad">Could not load: ' + esc(err.message || 'error') + '</p>'; });
+    authed('admin/fee/getStructure', {})
+      .then(function(d){ renderFeeStructure(d); })
+      .catch(function(){});
+  }
+  function updateFeesBadge(d){
+    var b = qs('#fees-badge'); if (!b) return;
+    var n = (d && d.pastLock && d.students) ? d.students.length : 0;
+    if (n > 0){ b.hidden = false; b.textContent = n; } else b.hidden = true;
+  }
+  function renderBlocked(d){
+    var host = qs('#fees-blocked'); if (!host) return;
+    d = d || {}; var list = Array.isArray(d.students) ? d.students : [];
+    var head = '<div class="stu-sec">Unpaid this month — ' + esc(d.label || '') +
+      (d.pastLock ? ' <span class="badge badge--warn">locked after the ' + d.lockDay + 'th</span>'
+                  : ' <span class="muted">(lock starts on the ' + d.lockDay + 'th)</span>') + '</div>';
+    if (!list.length){ host.innerHTML = head + '<p class="muted">Everyone has paid this month.</p>'; return; }
+    var rows = list.map(function(r){
+      return '<div class="fee-month" style="display:flex;align-items:center;justify-content:space-between;gap:10px;padding:10px 12px;border:1px solid var(--line,#e5e7eb);border-radius:10px;margin-bottom:8px">' +
+        '<div><div style="font-weight:600">' + esc(r.fullName || '—') + ' <span class="muted">' + esc(r.studentId) + '</span></div>' +
+        '<span class="muted" style="font-size:.82rem">Class ' + (r.classLevel || '—') + ' · ' + feeMoney(r.totalFee) +
+          (r.blockedAt ? (' · locked since ' + fmtDate(r.blockedAt)) : ' · not locked yet') + '</span></div>' +
+        '<button class="btn btn--primary btn--sm" data-act="fee-paid-blocked" data-key="' + esc(r.studentId) + '" data-period="' + esc(d.period) + '">Mark paid</button>' +
+      '</div>';
+    }).join('');
+    host.innerHTML = head + rows;
+  }
+  function renderFeeStructure(d){
+    var host = qs('#fees-structure'); if (!host) return;
+    d = d || {};
+    var eff = d.effectiveNow || d.defaults || {};
+    var tiers = d.tiers || ['Basic', 'Plus', 'Max'];
+    function num(v){ return Number(v) || 0; }
+    function midRow(t){ var o = (eff.Middle && eff.Middle[t]) || {};
+      return '<tr><td style="padding:4px 10px;font-weight:600">' + t + '</td>' +
+        '<td style="padding:4px 10px"><input class="input fee-in" data-band="Middle" data-tier="' + t + '" data-kind="flat" type="number" min="0" value="' + num(o.flat) + '" style="width:110px"></td>' +
+        '<td style="padding:4px 10px"><input class="input fee-in" data-band="Middle" data-tier="' + t + '" data-kind="per" type="number" min="0" value="' + num(o.per) + '" style="width:110px"></td></tr>'; }
+    function perRow(band, t){ var v = num(eff[band] && eff[band][t]);
+      return '<tr><td style="padding:4px 10px;font-weight:600">' + t + '</td><td style="padding:4px 10px" colspan="2"><input class="input fee-in" data-band="' + band + '" data-tier="' + t + '" data-kind="per" type="number" min="0" value="' + v + '" style="width:110px"></td></tr>'; }
+    var html = '<div class="stu-sec">Fee structure (monthly, PKR)</div>' +
+      '<p class="muted" style="font-size:.85rem">Edit and Save to revise fees. A revision applies from <b>' + esc(d.nextDefaultEffectiveLabel || 'next month') + '</b> (1st of next month). Already-paid months never change; all active students are notified.</p>' +
+      '<div style="overflow-x:auto"><table class="fee-table" style="border-collapse:collapse;min-width:420px">' +
+        '<thead><tr><th style="text-align:left;padding:6px 10px">Plan</th><th style="padding:6px 10px">All 5 (flat)</th><th style="padding:6px 10px">Per subject</th></tr></thead>' +
+        '<tbody><tr><td colspan="3" style="font-weight:700;padding:8px 10px">Middle (Class 6–8)</td></tr>' + tiers.map(midRow).join('') +
+        '<tr><td colspan="3" style="font-weight:700;padding:8px 10px">Matric (Class 9–10) — per subject</td></tr>' + tiers.map(function(t){ return perRow('Matric', t); }).join('') +
+        '<tr><td colspan="3" style="font-weight:700;padding:8px 10px">Intermediate (Class 11–12) — per subject</td></tr>' + tiers.map(function(t){ return perRow('Intermediate', t); }).join('') +
+        '</tbody></table></div>' +
+      '<label class="stu-edit__row" style="margin-top:10px;max-width:320px"><span class="stu-edit__lbl">Effective from</span>' +
+        '<input class="input" id="fee-eff" type="date" value="' + esc((d.nextDefaultEffectiveFrom || '').slice(0, 10)) + '"></label>' +
+      '<div style="margin-top:10px"><button class="btn btn--primary btn--sm" data-act="fee-struct-save">Save new fee structure</button></div>';
+    host.innerHTML = html;
+  }
+  function feeSaveStructure(btn){
+    var host = qs('#fees-structure'); if (!host) return;
+    var prices = { Middle: {}, Matric: {}, Intermediate: {} };
+    Array.prototype.forEach.call(host.querySelectorAll('.fee-in'), function(inp){
+      var band = inp.getAttribute('data-band'), tier = inp.getAttribute('data-tier'), kind = inp.getAttribute('data-kind');
+      var val = Math.max(0, Math.floor(Number(inp.value) || 0));
+      if (band === 'Middle'){ prices.Middle[tier] = prices.Middle[tier] || {}; prices.Middle[tier][kind] = val; }
+      else { prices[band][tier] = val; }
+    });
+    var effIn = qs('#fee-eff'); var eff = (effIn && effIn.value) ? (effIn.value.slice(0, 7) + '-01') : '';
+    busy(btn, true);
+    authed('admin/fee/saveStructure', { prices: prices, effectiveFrom: eff })
+      .then(function(d){ toast('Fee structure saved — effective ' + (d.effectiveLabel || 'next month') + '. Students notified.', 'ok'); loadFees(); })
+      .catch(function(err){ toast(err.message || 'Failed.', 'bad'); busy(btn, false); });
+  }
+  // Fees-view click handling + online-checkbox toggle
+  (function wireFees(){
+    var feesPanel = qs('[data-panel="fees"]');
+    if (feesPanel) feesPanel.addEventListener('click', function(e){
+      var b = e.target.closest ? e.target.closest('[data-act]') : null; if (!b) return;
+      var a = b.getAttribute('data-act');
+      if (a === 'fees-refresh') return loadFees();
+      if (a === 'fee-struct-save') return feeSaveStructure(b);
+      if (a === 'fee-paid-blocked'){
+        busy(b, true);
+        return authed('admin/fee/markPaid', { studentId: b.getAttribute('data-key'), period: b.getAttribute('data-period') })
+          .then(function(){ toast('Marked paid.', 'ok'); loadFees(); })
+          .catch(function(err){ toast(err.message || 'Failed.', 'bad'); busy(b, false); });
+      }
+    });
+    var res = qs('#results');
+    if (res) res.addEventListener('change', function(e){
+      var c = e.target.closest ? e.target.closest('.fee-online-on') : null;
+      if (c){ var box = c.closest('.fee-online'); var amt = box && box.querySelector('.fee-online-amt'); if (amt) amt.disabled = !c.checked; }
+    });
+  })();
 
   // ---- Yearly promotion (4b): select on cards -> Promote; review -> Approve ----
   function promoSelectedIds(){
