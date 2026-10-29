@@ -1981,6 +1981,23 @@ window.WHAAdminRecheckBridge = {
     return f ? f.total : null;
   }
 
+  // Board follows the Class (mirrors enroll.html). KPK is offered ONLY for the
+  // classes in KPK_CLASSES; keep this in sync with enroll.html.
+  var KPK_CLASSES = [10];
+  function edBoardFor(cls, curBoard){
+    cls = Number(cls);
+    var cb = String(curBoard || '');
+    if (cls <= 8) {
+      return '<label class="stu-edit__row"><span class="stu-edit__lbl">Board</span><select class="input" data-field="board" disabled><option selected>APSACS</option></select></label>';
+    }
+    if (KPK_CLASSES.indexOf(cls) === -1) {
+      return '<label class="stu-edit__row"><span class="stu-edit__lbl">Board</span><select class="input" data-field="board" disabled><option selected>Federal</option></select></label>';
+    }
+    var fedSel = (cb !== 'KPK') ? ' selected' : '';
+    var kpkSel = (cb === 'KPK') ? ' selected' : '';
+    return '<label class="stu-edit__row"><span class="stu-edit__lbl">Board</span><select class="input" data-field="board">' +
+      '<option value="Federal"' + fedSel + '>Federal (FBISE)</option><option value="KPK"' + kpkSel + '>KPK</option></select></label>';
+  }
   function edDynamicHtml(cls, cur){
     cur = cur || {};
     var k = edBandKey(cls), band = edBandName(cls);
@@ -2008,12 +2025,12 @@ window.WHAAdminRecheckBridge = {
     if (cur.fullAll && String(cls) === String(cur.origCls) && edSubjKey(tickedNow) === cur.origSubs) nChecked = cur.fullAll;   // all-subjects account, untouched
     var planHtml = '<label class="stu-edit__row"><span class="stu-edit__lbl">Plan</span><select class="input" data-field="plan">'+planOpts+'</select></label>'+
       '<div class="stu-edit__row"><span class="stu-edit__lbl">Monthly fee</span><div data-fee-slot>'+edFeeInner(band, curPlan, nChecked, cur.savedFee)+'</div></div>';
-    return streamHtml + subsHtml + planHtml;
+    return edBoardFor(cls, cur.board) + streamHtml + subsHtml + planHtml;
   }
   function edCurrentFromForm(ed){
     function v(f){ var el=ed.querySelector('[data-field="'+f+'"]'); return el?el.value:''; }
     var subs = Array.prototype.map.call(ed.querySelectorAll('[data-subject]:checked'), function(c){ return c.value; });
-    return { stream:v('stream'), plan:v('plan'), subjects:subs,
+    return { stream:v('stream'), plan:v('plan'), subjects:subs, board:v('board'),
              fullAll:Number(ed.getAttribute('data-full-n')) || 0, origCls:ed.getAttribute('data-orig-cls'), origSubs:ed.getAttribute('data-orig-subs') };
   }
 
@@ -2030,7 +2047,7 @@ window.WHAAdminRecheckBridge = {
     var fullAll = isFullScope(s.enrolledScope || fd.enrolledScope) ? (ED_ALL_COUNT[edBandName(cls)] || 0) : 0;
     var origSubs = edSubjKey(subjects);
     var cur = { stream: fd.stream||'', subjects: subjects, plan: fd.plan||fd.planTier||'', savedFee: fd.planPrice,
-                fullAll: fullAll, origCls: String(cls), origSubs: origSubs };
+                board: fd.board||'', fullAll: fullAll, origCls: String(cls), origSubs: origSubs };
 
     var classOpts = '';
     for (var c=6;c<=12;c++){ classOpts += '<option value="'+c+'"'+(c===cls?' selected':'')+'>Class '+c+'</option>'; }
@@ -2047,7 +2064,7 @@ window.WHAAdminRecheckBridge = {
     html += '<label class="stu-edit__row"><span class="stu-edit__lbl">Tuition mode</span><select class="input" data-field="tuitionMode">'+tuitOpts+'</select></label>';
     html += '<div class="ed-dynamic">'+edDynamicHtml(cls, cur)+'</div>';
 
-    var handled = {fullName:1,email:1,whatsapp:1,classLevel:1,tuitionMode:1,stream:1,subjects:1,plan:1,planTier:1,planPrice:1,classBand:1,source:1,submittedAtLocal:1};
+    var handled = {fullName:1,email:1,whatsapp:1,classLevel:1,tuitionMode:1,stream:1,subjects:1,plan:1,planTier:1,planPrice:1,classBand:1,board:1,source:1,submittedAtLocal:1};
     ['fatherName','fatherOccupation','schoolName','address','otherSubject'].forEach(function(k){ html += txt(k, prettyKey(k), fmtPlain(fd[k])); handled[k]=1; });
     Object.keys(fd).forEach(function(k){ if (handled[k]) return; html += txt(k, prettyKey(k), fmtPlain(fd[k])); });
 
