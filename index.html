@@ -856,6 +856,18 @@ select.input { appearance: auto; background: var(--surface); }
     .stu-toolbar select { max-width:200px; }
     .bulk-bar { display:flex; align-items:center; gap:.6rem; margin-left:auto; font-size:.85rem; color:#334155; }
   </style>
+<style>
+  .fee-strip{display:flex;align-items:center;gap:10px;flex-wrap:wrap;padding:10px 16px;border-top:1px solid var(--line,#e5e7eb);background:var(--surface-2,#f8fafc)}
+  .fee-strip__lbl{font-size:.82rem;color:var(--muted,#64748b);font-weight:600}
+  .fee-strip__amt{font-size:.82rem;color:var(--muted,#64748b)}
+  .fee-strip__pill{font-size:.74rem;font-weight:800;letter-spacing:.5px;padding:4px 12px;border-radius:999px}
+  .fee-strip__pill--paid{background:#dcfce7;color:#15803d}
+  .fee-strip__pill--due{background:#fee2e2;color:#dc2626}
+  .fee-strip__pill--none{background:#f1f5f9;color:#64748b}
+  .fee-bulkbar{display:flex;align-items:center;gap:12px;flex-wrap:wrap;margin:10px 0 14px;padding:10px 14px;border:1px solid var(--line,#e5e7eb);border-radius:10px;background:var(--surface-2,#f8fafc)}
+  .fee-blk-row{display:flex;align-items:center;gap:12px}
+  .fee-blk-row input[type=checkbox]{width:18px;height:18px;cursor:pointer;flex:0 0 auto}
+</style>
 </head>
 
 <body>
@@ -1869,7 +1881,36 @@ window.WHAAdminRecheckBridge = {
         '</div>' +
         '<svg class="stu-caret" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M6 9l6 6 6-6"/></svg>' +
       '</div>' +
+      (sid ? feeStripHtml(s) : '') +
       '<div class="stu-body">' + stuBodyInner(s) + '</div></div>';
+  }
+
+  // Always-visible fee status strip on the card: this month Paid/Unpaid + a
+  // one-click Mark paid (no need to open the Monthly fee panel).
+  function feePeriodLabelShort(p){
+    var m = String(p||'').split('-'); var names = ['January','February','March','April','May','June','July','August','September','October','November','December'];
+    return (names[(Number(m[1])||1)-1]||'') + ' ' + (m[0]||'');
+  }
+  function feeStripHtml(s){
+    var sid = String(s.studentId||'');
+    var period = String(s.feePeriod||'');
+    var st = s.feeStatus; // 'Paid' | 'Pending' | null
+    var total = (s.feeTotal==null) ? null : Number(s.feeTotal);
+    var label = period ? feePeriodLabelShort(period) : 'This month';
+    var pill, btn = '';
+    if (st === 'Paid') {
+      pill = '<span class="fee-strip__pill fee-strip__pill--paid">PAID</span>';
+    } else if (st === 'Pending') {
+      pill = '<span class="fee-strip__pill fee-strip__pill--due">UNPAID</span>';
+      btn = '<button class="btn btn--primary btn--sm" data-act="fee-card-paid" data-key="'+esc(sid)+'" data-period="'+esc(period)+'">Mark paid</button>';
+    } else {
+      pill = '<span class="fee-strip__pill fee-strip__pill--none">No voucher yet</span>';
+      btn = '<button class="btn btn--secondary btn--sm" data-act="fee-card-paid" data-key="'+esc(sid)+'" data-period="'+esc(period)+'">Mark paid</button>';
+    }
+    var amt = (total!=null) ? ('<span class="fee-strip__amt">PKR '+total.toLocaleString()+'</span>') : '';
+    return '<div class="fee-strip" data-fee-strip="'+esc(sid)+'">' +
+      '<span class="fee-strip__lbl">Fee &middot; '+esc(label)+'</span>' + pill + amt +
+      '<span style="flex:1 1 auto"></span>' + btn + '</div>';
   }
 
   // ---- inline edit of a student's enrollment fields ----
@@ -4484,6 +4525,7 @@ window.WHAAdminRecheckBridge = {
       if (a === 'stu-cancel') return cancelStuEdit(b.dataset.key);
       if (a === 'stu-voucher') return openVoucher(b.dataset.key);
       if (a === 'fee-open') return openStuFee(b.dataset.key);
+      if (a === 'fee-card-paid') return feeCardPaid(b.dataset.key, b.dataset.period, b);
       if (a === 'fee-back') return feeBack(b.dataset.key);
       if (a === 'fee-paid') return feeMark(b.dataset.key, b.dataset.period, true, b);
       if (a === 'fee-unpaid') return feeMark(b.dataset.key, b.dataset.period, false, b);
@@ -4502,6 +4544,24 @@ window.WHAAdminRecheckBridge = {
     return st === 'Paid'
       ? '<span class="badge badge--ok">Paid</span>'
       : '<span class="badge badge--warn">Pending</span>';
+  }
+  // One-click mark-paid from the card strip. Optimistic: updates the strip in
+  // place (no list reload), and updates the cached student so a later render stays correct.
+  function feeCardPaid(sid, period, btn){
+    busy(btn, true);
+    authed('admin/fee/markPaid', { studentId: sid, period: period })
+      .then(function(){
+        toast('Marked paid.', 'ok');
+        var strip = document.querySelector('.fee-strip[data-fee-strip="' + (window.CSS && CSS.escape ? CSS.escape(sid) : sid) + '"]');
+        if (strip){
+          var lbl = strip.querySelector('.fee-strip__lbl');
+          strip.innerHTML = (lbl ? lbl.outerHTML : '') +
+            '<span class="fee-strip__pill fee-strip__pill--paid">PAID</span>';
+        }
+        // keep the in-memory list in sync so a re-render doesn't revert it
+        try { (results || []).forEach(function(r){ if (String(r.studentId) === String(sid)) { r.feeStatus = 'Paid'; } }); } catch (e) {}
+      })
+      .catch(function(err){ toast(err.message || 'Failed.', 'bad'); busy(btn, false); });
   }
   function openStuFee(sid){
     var card = findCardByKey(sid); if (!card) return;
@@ -4594,15 +4654,28 @@ window.WHAAdminRecheckBridge = {
       (d.pastLock ? ' <span class="badge badge--warn">locked after the ' + d.lockDay + 'th</span>'
                   : ' <span class="muted">(lock starts on the ' + d.lockDay + 'th)</span>') + '</div>';
     if (!list.length){ host.innerHTML = head + '<p class="muted">Everyone has paid this month.</p>'; return; }
+    var bulk = '<div class="fee-bulkbar">' +
+      '<label class="fee-blk-row"><input type="checkbox" data-act="fee-selall"> <b>Select all</b></label>' +
+      '<span class="muted" data-fee-selcount>0 selected</span>' +
+      '<span style="flex:1 1 auto"></span>' +
+      '<button class="btn btn--primary btn--sm" data-act="fee-mark-selected" data-period="' + esc(d.period) + '">Mark selected paid</button>' +
+    '</div>';
     var rows = list.map(function(r){
-      return '<div class="fee-month" style="display:flex;align-items:center;justify-content:space-between;gap:10px;padding:10px 12px;border:1px solid var(--line,#e5e7eb);border-radius:10px;margin-bottom:8px">' +
-        '<div><div style="font-weight:600">' + esc(r.fullName || '—') + ' <span class="muted">' + esc(r.studentId) + '</span></div>' +
+      return '<div class="fee-month fee-blk-row" style="justify-content:space-between;gap:10px;padding:10px 12px;border:1px solid var(--line,#e5e7eb);border-radius:10px;margin-bottom:8px">' +
+        '<input type="checkbox" class="fee-blk-check" data-key="' + esc(r.studentId) + '">' +
+        '<div style="flex:1 1 auto"><div style="font-weight:600">' + esc(r.fullName || '—') + ' <span class="muted">' + esc(r.studentId) + '</span></div>' +
         '<span class="muted" style="font-size:.82rem">Class ' + (r.classLevel || '—') + ' · ' + feeMoney(r.totalFee) +
           (r.blockedAt ? (' · locked since ' + fmtDate(r.blockedAt)) : ' · not locked yet') + '</span></div>' +
         '<button class="btn btn--primary btn--sm" data-act="fee-paid-blocked" data-key="' + esc(r.studentId) + '" data-period="' + esc(d.period) + '">Mark paid</button>' +
       '</div>';
     }).join('');
-    host.innerHTML = head + rows;
+    host.innerHTML = head + bulk + rows;
+  }
+  function feeSelCount(){
+    var host = qs('#fees-blocked'); if (!host) return 0;
+    var n = host.querySelectorAll('.fee-blk-check:checked').length;
+    var c = host.querySelector('[data-fee-selcount]'); if (c) c.textContent = n + ' selected';
+    return n;
   }
   function renderFeeStructure(d){
     var host = qs('#fees-structure'); if (!host) return;
@@ -4658,6 +4731,22 @@ window.WHAAdminRecheckBridge = {
           .then(function(){ toast('Marked paid.', 'ok'); loadFees(); })
           .catch(function(err){ toast(err.message || 'Failed.', 'bad'); busy(b, false); });
       }
+      if (a === 'fee-selall'){
+        var on = b.checked;
+        feesPanel.querySelectorAll('.fee-blk-check').forEach(function(c){ c.checked = on; });
+        feeSelCount(); return;
+      }
+      if (a === 'fee-mark-selected'){
+        var ids = Array.prototype.map.call(feesPanel.querySelectorAll('.fee-blk-check:checked'), function(c){ return c.getAttribute('data-key'); });
+        if (!ids.length){ toast('Select at least one student.', 'warn'); return; }
+        busy(b, true);
+        return authed('admin/fee/markPaidMany', { studentIds: ids, period: b.getAttribute('data-period') })
+          .then(function(d){ toast('Marked paid for ' + (d && d.count || ids.length) + ' student(s).', 'ok'); loadFees(); })
+          .catch(function(err){ toast(err.message || 'Failed.', 'bad'); busy(b, false); });
+      }
+    });
+    if (feesPanel) feesPanel.addEventListener('change', function(e){
+      if (e.target && e.target.classList && e.target.classList.contains('fee-blk-check')) feeSelCount();
     });
     var res = qs('#results');
     if (res) res.addEventListener('change', function(e){
