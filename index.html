@@ -870,6 +870,9 @@ select.input { appearance: auto; background: var(--surface); }
   .pres-dot{display:inline-block;width:9px;height:9px;border-radius:50%;margin-right:7px;vertical-align:middle}
   .pres-dot--on{background:#16a34a;box-shadow:0 0 0 3px rgba(22,163,74,.18)}
   .pres-dot--off{background:#cbd5e1}
+  .pres-box{display:inline-block;font-size:.76rem;font-weight:700;padding:3px 10px;border-radius:999px;margin-left:4px}
+  .pres-box--on{background:#16a34a;color:#fff}
+  .pres-box--off{background:#fff;color:#64748b;border:1px solid var(--line,#e2e8f0)}
 </style>
 </head>
 
@@ -1033,7 +1036,9 @@ select.input { appearance: auto; background: var(--surface); }
           <option value="active">Active</option>
           <option value="suspended">Suspended</option>
           <option value="expired">Expired</option>
+          <option value="online">🟢 Online now</option>
         </select>
+        <span id="online-count" class="muted" style="font-size:.85rem;font-weight:700;color:#16a34a;align-self:center"></span>
         <button class="feepend-btn" type="button" data-act="go-pending-fee" id="feepend-btn" title="Show only enrolments waiting for fee confirmation — each has a WhatsApp reminder button" hidden>&#9203; Fee pending</button>
       </div>
 
@@ -1877,8 +1882,8 @@ window.WHAAdminRecheckBridge = {
       '<div class="stu-head">' +
         (sid && s.hasAccount ? '<input type="checkbox" class="promo-check" data-act="promo-check" data-key="' + esc(sid) + '" title="Select for promotion" style="flex:0 0 auto;width:18px;height:18px;cursor:pointer;">' : '') +
         '<div class="stu-head__main">' +
-          '<div class="stu-head__name">' + (sid ? presenceDotHtml(s) : '') + esc(s.fullName || '—') + '</div>' +
-          '<div class="stu-head__sub">' + (sid ? esc(sid) : 'ID not issued') + (sid ? ' <span class="muted" style="font-size:.78rem">· ' + presenceLabel(s) + '</span>' : '') + '</div>' +
+          '<div class="stu-head__name">' + esc(s.fullName || '—') + '</div>' +
+          '<div class="stu-head__sub">' + (sid ? esc(sid) : 'ID not issued') + (sid ? ' <span class="pres-slot" data-pres="' + esc(sid) + '">' + presenceBoxHtml(s) + '</span>' : '') + '</div>' +
         '</div>' +
         '<div class="stu-head__right">' +
           '<span class="badge ' + badgeFor(status) + '">' + esc(status) + '</span>' + actions +
@@ -2376,6 +2381,7 @@ window.WHAAdminRecheckBridge = {
     return (results || []).filter(function (s) {
       if (f === 'all') return true;
       if (f === 'no-account') return !s.hasAccount;
+      if (f === 'online') return presIsOnline(s.studentId);
       return normalizeStatus(s.status).toLowerCase() === f;
     });
   }
@@ -2755,6 +2761,7 @@ window.WHAAdminRecheckBridge = {
     runSearch('', null);
     loadStats();
     refreshUpBadge();
+    startPresencePoll();
   }
 
   // ==========================================================================
@@ -3273,7 +3280,7 @@ window.WHAAdminRecheckBridge = {
     document.addEventListener('change', function (e) {
     var t = e.target;
     if (!t) return;
-    if (t.id === 'f-filter') { stuPage = 1; renderResults(); return; }
+    if (t.id === 'f-filter') { stuPage = 1; if (t.value === 'online') pollPresence(); renderResults(); return; }
   });
 
   document.addEventListener('keydown', function (e) { if (!modal.hidden && e.key === 'Escape') closeMathEditor(); });
@@ -4551,6 +4558,41 @@ window.WHAAdminRecheckBridge = {
       ? '<span class="badge badge--ok">Paid</span>'
       : '<span class="badge badge--warn">Pending</span>';
   }
+  // ---- Live presence (poll every 20s; online/offline box per card) ----
+  var PRESENCE = {};
+  function presIsOnline(sid){ var p = PRESENCE[String(sid||'')]; return p ? !!p.online : false; }
+  function presenceBoxInner(online, lastSeen){
+    return online
+      ? '<span class="pres-box pres-box--on">\u25CF Online now</span>'
+      : '<span class="pres-box pres-box--off">last seen ' + esc(relTimeShort(lastSeen)) + '</span>';
+  }
+  function presenceBoxHtml(s){
+    var sid = String(s.studentId||''); var p = PRESENCE[sid];
+    var online = p ? !!p.online : !!s.online;
+    var lastSeen = p ? p.lastSeenAt : s.lastSeenAt;
+    return presenceBoxInner(online, lastSeen);
+  }
+  var presencePollTimer = null;
+  function stopPresencePoll(){ if (presencePollTimer){ clearInterval(presencePollTimer); presencePollTimer = null; } }
+  function startPresencePoll(){ stopPresencePoll(); pollPresence(); presencePollTimer = setInterval(pollPresence, 20000); }
+  function pollPresence(){
+    authed('admin/activity/presence', {}).then(function(d){
+      PRESENCE = {};
+      ((d && d.students) || []).forEach(function(r){ PRESENCE[String(r.studentId)] = { online: !!r.online, lastSeenAt: r.lastSeenAt }; });
+      applyPresence();
+    }).catch(function(){});
+  }
+  function applyPresence(){
+    Array.prototype.forEach.call(document.querySelectorAll('#results .pres-slot'), function(slot){
+      var sid = slot.getAttribute('data-pres'); if (!sid) return;
+      var p = PRESENCE[sid]; if (!p) return;
+      slot.innerHTML = presenceBoxInner(p.online, p.lastSeenAt);
+      try { (results||[]).forEach(function(s){ if (String(s.studentId)===sid){ s.online = p.online; s.lastSeenAt = p.lastSeenAt; } }); } catch(e){}
+    });
+    var oc = qs('#online-count'); if (oc){ var n=0; for (var k in PRESENCE){ if(PRESENCE[k].online) n++; } oc.textContent = n ? ('\uD83D\uDFE2 ' + n + ' online') : ''; }
+    if (currentFilter() === 'online') renderResults();
+  }
+
   // ==========================================================================
   // ACTIVITY TRACKING (v12.24) — presence dot + per-student Activity panel
   // ==========================================================================
