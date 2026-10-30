@@ -433,6 +433,10 @@ select.input { appearance: auto; background: var(--surface); }
 .gr-q__ans { background: var(--brand-tint); border-radius: var(--r-md); padding: 0.55rem 0.7rem; white-space: pre-wrap; overflow-wrap: break-word; font-size: 0.9375rem; }
 .gr-q__ans--empty { background: var(--line-soft); color: var(--muted); font-style: italic; }
 .gr-q__correct { font-size: 0.8125rem; color: var(--ok); margin-top: 0.35rem; }
+.gr-model { margin-top: 0.5rem; border: 1px dashed var(--border, #c7cbe0); border-radius: 8px; padding: 0.4rem 0.7rem; font-size: 0.8125rem; }
+.gr-model summary { cursor: pointer; font-weight: 700; }
+.gr-model p { margin: 0.4rem 0; white-space: pre-wrap; }
+.gr-model ul { margin: 0.3rem 0 0.2rem 1.1rem; padding: 0; }
 .gr-q__grade { display: flex; flex-wrap: wrap; gap: 0.75rem; align-items: flex-end; margin-top: 0.65rem; padding-top: 0.65rem; border-top: 1px dashed var(--line); }
 .gr-q__marksfield { width: 130px; flex-shrink: 0; }
 .gr-q__corrfield { flex: 1; min-width: 200px; }
@@ -1435,19 +1439,29 @@ select.input { appearance: auto; background: var(--surface); }
       marksVal = item.suggestedMarks;
     }
 
+    // KPK board-exam papers: model answer + marking points for the grader (never sent to students before grading).
+    var boardHtml = '';
+    if (item.modelAnswer || (item.rubric && item.rubric.length)) {
+      boardHtml = '<details class="gr-model"><summary>Model answer &amp; marking points' + (item.split ? ' · split ' + esc(item.split) : '') + '</summary>' +
+        (item.modelAnswer ? '<p>' + esc(item.modelAnswer) + '</p>' : '') +
+        ((item.rubric && item.rubric.length) ? '<ul>' + item.rubric.map(function (r) { return '<li>' + esc(r.t) + ' <em>(' + esc(r.m) + ')</em></li>'; }).join('') + '</ul>' : '') +
+        '</details>';
+    }
+    if (item.autoGraded) boardHtml = '<div class="gr-q__correct">Board MCQ — marked automatically (the server recalculates it when you save).</div>';
+
     var mcqQuick = (item.type === 'mcq')
       ? '<div class="gr-mcqmark"><button class="btn btn--quiet btn--sm" type="button" data-act="gr-mcq-full">Full</button>' +
         '<button class="btn btn--quiet btn--sm" type="button" data-act="gr-mcq-zero">0</button></div>'
       : '';
 
     return '<div class="gr-q" data-qid="' + esc(item.qId) + '">' +
-        '<div class="gr-q__head"><span class="gr-q__num">Q' + (i + 1) + '</span>' +
+        '<div class="gr-q__head"><span class="gr-q__num">' + (item.label ? esc(item.label) : 'Q' + (i + 1)) + '</span>' +
           '<span class="gr-q__type">' + esc(typeLabel) + '</span>' +
           '<span class="cell-sub" style="margin-left:auto;">out of ' + esc(item.marks) + '</span></div>' +
         (item.type === 'steps'
           ? '<p class="gr-q__text" data-math="' + esc(item.text) + '"></p>'
           : '<p class="gr-q__text">' + esc(item.text) + '</p>') +
-        '<span class="gr-q__label">Student\'s answer</span>' + ansHtml + correctHtml +
+        '<span class="gr-q__label">Student\'s answer</span>' + ansHtml + correctHtml + boardHtml +
         '<div class="gr-q__grade">' +
           '<div class="gr-q__marksfield"><span class="gr-q__label">Marks</span>' +
             '<input class="input gr-marks-input" type="number" min="0" max="' + esc(item.marks) + '" step="0.5" data-qid="' + esc(item.qId) + '" value="' + esc(marksVal) + '"></div>' +
