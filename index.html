@@ -2317,6 +2317,7 @@ window.WHAAdminRecheckBridge = {
       '<div class="stu-list">' + pageRows.map(stuCard).join('') + '</div>' +
       stuPagerHtml(total, start, pageRows.length, shown.length) +
       '<p class="count">' + shown.length + ' total</p>';
+    try { applyPresence(true); } catch (e) {}
   }
 
   function stuPagerHtml(total, start, shown, totalRows){
@@ -2750,6 +2751,7 @@ window.WHAAdminRecheckBridge = {
     if (name === 'papers') loadPapers();
     if (name === 'archived') loadArchived();
     if (name === 'fees') loadFees();
+    if (name === 'students') startPresencePoll();
   }
 
   function enterConsole(email) {
@@ -4574,7 +4576,8 @@ window.WHAAdminRecheckBridge = {
   }
   var presencePollTimer = null;
   function stopPresencePoll(){ if (presencePollTimer){ clearInterval(presencePollTimer); presencePollTimer = null; } }
-  function startPresencePoll(){ stopPresencePoll(); pollPresence(); presencePollTimer = setInterval(pollPresence, 20000); }
+  function startPresencePoll(){ stopPresencePoll(); pollPresence(); presencePollTimer = setInterval(pollPresence, 10000); }
+  var PRES_PULSE = ['◐','◓','◑','◒'], PRES_TICK = 0;
   function pollPresence(){
     authed('admin/activity/presence', {}).then(function(d){
       PRESENCE = {};
@@ -4582,15 +4585,17 @@ window.WHAAdminRecheckBridge = {
       applyPresence();
     }).catch(function(){});
   }
-  function applyPresence(){
+  function applyPresence(fromRender){
     Array.prototype.forEach.call(document.querySelectorAll('#results .pres-slot'), function(slot){
       var sid = slot.getAttribute('data-pres'); if (!sid) return;
       var p = PRESENCE[sid]; if (!p) return;
       slot.innerHTML = presenceBoxInner(p.online, p.lastSeenAt);
       try { (results||[]).forEach(function(s){ if (String(s.studentId)===sid){ s.online = p.online; s.lastSeenAt = p.lastSeenAt; } }); } catch(e){}
     });
-    var oc = qs('#online-count'); if (oc){ var n=0; for (var k in PRESENCE){ if(PRESENCE[k].online) n++; } oc.textContent = n ? ('\uD83D\uDFE2 ' + n + ' online') : ''; }
-    if (currentFilter() === 'online') renderResults();
+    var oc = qs('#online-count'); if (oc){ var n=0; for (var k in PRESENCE){ if(PRESENCE[k].online) n++; } oc.textContent = '\uD83D\uDFE2 ' + n + ' online ' + PRES_PULSE[(PRES_TICK++) % 4]; }
+    // When the "Online now" filter is active, a presence change can add/remove
+    // rows \u2014 re-render (but NOT when applyPresence was itself called FROM a render).
+    if (!fromRender && currentFilter() === 'online') renderResults();
   }
 
   // ==========================================================================
