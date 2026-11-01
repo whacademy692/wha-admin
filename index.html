@@ -499,6 +499,7 @@ select.input { appearance: auto; background: var(--surface); }
 .gr-q__correct { font-size: 0.8125rem; color: var(--ok); margin-top: 0.35rem; }
 .gr-model { margin-top: 0.5rem; border: 1px dashed var(--border, #c7cbe0); border-radius: 8px; padding: 0.4rem 0.7rem; font-size: 0.8125rem; }
 .gr-model summary { cursor: pointer; font-weight: 700; }
+.gr-rt-h { display: inline-block; text-decoration: underline; color: var(--brand, #4f46e5); }
 .gr-model p { margin: 0.4rem 0; white-space: pre-wrap; }
 .gr-model ul { margin: 0.3rem 0 0.2rem 1.1rem; padding: 0; }
 .gr-q__grade { display: flex; flex-wrap: wrap; gap: 0.75rem; align-items: flex-end; margin-top: 0.65rem; padding-top: 0.65rem; border-top: 1px dashed var(--line); }
@@ -3406,6 +3407,19 @@ window.WHAAdminRecheckBridge = {
       .catch(function (e) { host.innerHTML = ''; fail(e, 'Could not open this submission.'); });
   }
 
+  // KPK board answers are stored with light tags ([h] [b] [i] [u] [c=red]); show them formatted, safely.
+  function grRich(bb) {
+    var COL = { red: '#dc2626', blue: '#2563eb', green: '#15803d', purple: '#7c3aed', orange: '#ea580c' };
+    return esc(bb == null ? '' : bb)
+      .replace(/\[h\]/g, '<strong class="gr-rt-h">').replace(/\[\/h\]\n?/g, '</strong><br>')
+      .replace(/\[(b|i|u)\]/g, '<$1>').replace(/\[\/(b|i|u)\]/g, '</$1>')
+      .replace(/\[c=(red|blue|green|purple|orange)\]/g, function (m, c) { return '<span style="color:' + COL[c] + '">'; })
+      .replace(/\[\/c\]/g, '</span>').replace(/\n/g, '<br>');
+  }
+  function grRollLine(d) {
+    var r = d && d.roll; if (!r || !r.filled) return '';
+    return ' · Roll filled: ' + String(r.filled).replace(/_/g, '·') + (r.assigned ? (r.match ? ' ✓ matches' : ' ✗ MISMATCH (assigned ' + r.assigned + ')') : '');
+  }
   function grQuestionCard(item, i) {
     var typeLabel = String(item.type || '').toUpperCase();
     var ansHtml;
@@ -3448,7 +3462,8 @@ window.WHAAdminRecheckBridge = {
       }
     } else {
       var val = (item.yourAnswer == null || item.yourAnswer === '') ? '' : String(item.yourAnswer);
-      ansHtml = val ? '<div class="gr-q__ans">' + esc(val) + '</div>' : '<div class="gr-q__ans gr-q__ans--empty">No answer given</div>';
+      var isBoardW = (item.section === 'B' || item.section === 'C');
+      ansHtml = val ? '<div class="gr-q__ans">' + (isBoardW ? grRich(val) : esc(val)) + '</div>' : '<div class="gr-q__ans gr-q__ans--empty">No answer given</div>';
     }
 
     // Pre-fill: keep an existing mark; otherwise auto-suggest MCQ from the
@@ -3500,7 +3515,7 @@ window.WHAAdminRecheckBridge = {
     grState.total = Number(d.totalMarks) || 0;
     qs('#gr-grade-title').textContent = d.studentName || 'Student';
     qs('#gr-grade-sub').textContent = esc(d.studentId) + ' · ' + (d.paperTitle || '') + ' · ' + grState.total + ' marks total' +
-      (d.gradedAt ? ' · last graded ' + fmtDateKeep(d.gradedAt) : '');
+      grRollLine(d) + (d.gradedAt ? ' · last graded ' + fmtDateKeep(d.gradedAt) : '');
     qs('#gr-overall').value = d.overallFeedback || '';
     qs('#gr-grade-host').innerHTML = (d.items || []).map(grQuestionCard).join('');
     if (window.MathText) MathText.render(qs('#gr-grade-host'));
