@@ -599,6 +599,16 @@ select.input { appearance: auto; background: var(--surface); }
 .uq-info { margin: 8px 0; padding: 8px 10px; border-radius: 10px; background: #eef2ff; color: #3730a3; font-size: .85rem; line-height: 1.45; }
 .uq-rr { display: block; margin-top: 2px; color: #475569; font-size: .82rem; white-space: pre-wrap; overflow-wrap: anywhere; }
 .uq-form--note { grid-template-columns: 1fr; }
+.rq-contact { display: flex; gap: 6px 14px; flex-wrap: wrap; margin: 8px 0; font-size: .85rem; color: #475569; }
+.rq-contact b { color: #0f172a; }
+.rq-contact a { color: #4f46e5; text-decoration: none; font-weight: 600; }
+.rq-change { margin: 8px 0; padding: 9px 11px; border-radius: 10px; background: #eef2ff; border: 1px solid #c7d2fe; font-size: .9rem; line-height: 1.5; overflow-wrap: anywhere; }
+.rq-change span { display: block; font-size: .72rem; color: #4338ca; text-transform: uppercase; letter-spacing: .05em; font-weight: 700; }
+.uq-warn--red { background: #fee2e2; color: #991b1b; }
+.btn--danger { background: #b91c1c; border-color: #b91c1c; color: #fff; }
+.btn--danger:hover { background: #991b1b; }
+.pc-card--leave.is-on { border-color: #b45309; box-shadow: 0 8px 22px rgba(180,83,9,.14); }
+.pc-card--del.is-on { border-color: #b91c1c; box-shadow: 0 8px 22px rgba(185,28,28,.14); }
 /* Student edit form: computed monthly fee */
 .ed-fee { display: flex; flex-direction: column; gap: 2px; }
 .ed-fee b { font-size: 1.05rem; }
@@ -968,6 +978,11 @@ select.input { appearance: auto; background: var(--surface); }
         Plan Changes
         <span class="nav-badge" id="up-badge" hidden></span>
       </button>
+      <button class="side__item" data-view="requests" type="button">
+        <svg viewBox="0 0 24 24" stroke-width="2" aria-hidden="true"><path stroke-linecap="round" stroke-linejoin="round" d="M4 5h16v11H8l-4 4V5z"/><path stroke-linecap="round" d="M8 9h8M8 12h5"/></svg>
+        Requests
+        <span class="nav-badge" id="rq-badge" hidden></span>
+      </button>
       <button class="side__item" data-view="fees" type="button">
         <svg viewBox="0 0 24 24" stroke-width="2" aria-hidden="true"><rect x="2" y="6" width="20" height="12" rx="2"/><circle cx="12" cy="12" r="2.5"/><path stroke-linecap="round" d="M6 12h.01M18 12h.01"/></svg>
         Fees
@@ -1074,6 +1089,21 @@ select.input { appearance: auto; background: var(--surface); }
       </header>
       <div id="up-cards" class="pc-cards"></div>
       <div id="up-list"><p class="muted">Loading…</p></div>
+    </section>
+
+    <section data-panel="requests" hidden>
+      <header class="head">
+        <div>
+          <h1 class="head__title">Requests</h1>
+          <p class="head__sub">
+            Leave, correct-my-info and delete-my-data requests sent by students or parents from the dashboard Settings page.
+            Pick a card to see only that list, with its history underneath. Newest requests are on top.
+          </p>
+        </div>
+        <button class="btn btn--quiet btn--sm" data-act="rq-refresh" type="button">Refresh</button>
+      </header>
+      <div id="rq-cards" class="pc-cards"></div>
+      <div id="rq-list"><p class="muted">Loading…</p></div>
     </section>
 
     <section data-panel="archived" hidden>
@@ -1627,7 +1657,7 @@ select.input { appearance: auto; background: var(--surface); }
   var RETRYABLE_OPS = {
     'insights/adminList': 1, 'insights/approved': 1,
     'admin/statistics': 1, 'admin/searchStudents': 1, 'admin/listTeachers': 1, 'admin/devices': 1,
-    'admin/listPromotions': 1, 'admin/listUpgradeRequests': 1,
+    'admin/listPromotions': 1, 'admin/listUpgradeRequests': 1, 'admin/requests/list': 1,
     'bossbattle/admin/listPapers': 1, 'bossbattle/admin/listSubmissions': 1,
     'bossbattle/admin/getPaperForEdit': 1, 'bossbattle/admin/submissionForGrading': 1
   };
@@ -2757,6 +2787,7 @@ window.WHAAdminRecheckBridge = {
     if (name === 'archived') loadArchived();
     if (name === 'fees') loadFees();
     if (name === 'students') startPresencePoll();
+    if (name === 'requests') loadRequests();
   }
 
   function enterConsole(email) {
@@ -2768,6 +2799,7 @@ window.WHAAdminRecheckBridge = {
     runSearch('', null);
     loadStats();
     refreshUpBadge();
+    refreshRqBadge();
     startPresencePoll();
   }
 
@@ -4539,8 +4571,258 @@ window.WHAAdminRecheckBridge = {
     });
   }
 
+  // ==========================================================================
+  // REQUESTS — leave / correct my info / delete my data, sent from the student
+  // dashboard Settings page. Backend: admin/requests/list | resolve | anonymise.
+  // ==========================================================================
+  var rqData = { pending: [], awaiting: [], recent: [], counts: {} };
+  var rqKind = '';
+
+  function setRqBadge(n) {
+    var b = qs('#rq-badge'); if (!b) return;
+    b.textContent = n > 99 ? '99+' : String(n);
+    b.hidden = !(n > 0);
+  }
+  function rqTotal(d) {
+    var c = (d && d.counts) || {};
+    return (Number(c.Leave) || 0) + (Number(c.Correction) || 0) + (Number(c.Deletion) || 0) + (Number(c.awaitingDeletion) || 0);
+  }
+  // Quiet count for the sidebar badge - never an error toast (older backend may not have the routes).
+  function refreshRqBadge() {
+    return authed('admin/requests/list', {})
+      .then(function (d) { setRqBadge(rqTotal(d)); })
+      .catch(function () { /* ignore */ });
+  }
+
+  function loadRequests() {
+    var host = qs('#rq-list'); if (!host) return;
+    host.innerHTML = '<p class="muted">Loading…</p>';
+    return authed('admin/requests/list', {})
+      .then(function (d) {
+        rqData = {
+          pending: (d && d.pending) || [], awaiting: (d && d.awaiting) || [],
+          recent: (d && d.recent) || [], counts: (d && d.counts) || {}
+        };
+        setRqBadge(rqTotal(rqData));
+        if (!rqKind) {   // open on the card that has something waiting
+          var c = rqData.counts;
+          rqKind = (c.Leave || 0) >= (c.Correction || 0) && (c.Leave || 0) >= ((c.Deletion || 0) + (c.awaitingDeletion || 0)) && c.Leave ? 'Leave'
+            : (c.Correction || 0) >= ((c.Deletion || 0) + (c.awaitingDeletion || 0)) && c.Correction ? 'Correction'
+            : ((c.Deletion || 0) + (c.awaitingDeletion || 0)) ? 'Deletion' : 'Leave';
+        }
+        renderRequests();
+      })
+      .catch(function (e) { host.innerHTML = ''; fail(e, 'Could not load requests.'); });
+  }
+
+  function rqTime(iso) { var t = Date.parse(iso || ''); return isNaN(t) ? 0 : t; }
+
+  function rqCardsHtml() {
+    var c = rqData.counts || {};
+    function card(kind, title, icon, cls, n, sub) {
+      var on = rqKind === kind;
+      return '<button type="button" class="pc-card ' + cls + (on ? ' is-on' : '') + '" data-act="rq-pick" data-kind="' + kind + '" aria-pressed="' + (on ? 'true' : 'false') + '">' +
+        '<span class="pc-card__top"><span class="pc-card__name">' + icon + ' ' + title + '</span>' +
+          '<span class="pc-card__n' + (n ? '' : ' pc-card__n--zero') + '">' + n + '</span></span>' +
+        '<span class="pc-card__sub">' + (n ? sub : 'Nothing waiting') + '</span>' +
+      '</button>';
+    }
+    var delN = (Number(c.Deletion) || 0) + (Number(c.awaitingDeletion) || 0);
+    var delSub = (Number(c.Deletion) || 0) + ' to decide' + ((Number(c.awaitingDeletion) || 0) ? ' · ' + c.awaitingDeletion + ' waiting for “Delete data now”' : '');
+    return card('Leave', 'Leave', '&#128682;', 'pc-card--leave', Number(c.Leave) || 0, (Number(c.Leave) || 0) + ' waiting for approval') +
+      card('Correction', 'Correct info', '&#9998;', 'pc-card--up', Number(c.Correction) || 0, (Number(c.Correction) || 0) + ' waiting to be fixed') +
+      card('Deletion', 'Delete data', '&#128465;', 'pc-card--del', delN, delSub);
+  }
+
+  function rqHead(r) {
+    var kindWord = r.type === 'Leave' ? 'Leave' : r.type === 'Correction' ? 'Correct info' : 'Delete data';
+    return '<div class="uq-top">' +
+        '<div class="uq-name">' + esc(r.fullName || '—') + ' <span class="uq-id">' + esc(r.studentId) + '</span>' +
+          (r.classLevel ? ' <span class="badge badge--neutral">Class ' + esc(r.classLevel) + '</span>' : '') + '</div>' +
+        '<div class="uq-when">Requested ' + esc(fmtDate(r.requestedAt)) + '</div>' +
+      '</div>' +
+      '<div class="uq-change"><span class="uq-kind uq-kind--up">' + esc(kindWord) + '</span></div>';
+  }
+
+  function rqContact(r) {
+    var c = r.contact;
+    if (!c) return '<div class="rq-contact"><span>No enrolment record found for this student.</span></div>';
+    var wa = String(c.whatsapp || '').trim(), digits = wa.replace(/[^0-9]/g, '');
+    var waHtml = wa ? '<span>WhatsApp: <b>' + esc(wa) + '</b>' + (digits.length >= 10
+        ? ' <a href="https://wa.me/' + esc(digits.replace(/^0/, '92')) + '" target="_blank" rel="noopener noreferrer">open chat</a>' : '') + '</span>' : '';
+    return '<div class="rq-contact">' + waHtml +
+      (c.email ? '<span>Email: <b>' + esc(c.email) + '</b></span>' : '') +
+      (c.board ? '<span>Board: <b>' + esc(c.board) + '</b></span>' : '') +
+      '<span>Account: <b>' + esc(c.accountStatus || '—') + '</b></span></div>';
+  }
+
+  function rqBody(r) {
+    var d = (r.details && typeof r.details === 'object') ? r.details : {};
+    var out = '';
+    if (r.type === 'Correction') {
+      out += '<div class="rq-change"><span>Wants this changed</span><b>' + esc(d.fieldLabel || r.reason || '—') + '</b> &rarr; ' + esc(d.newValue || '—') + '</div>';
+    } else if (r.reason) {
+      out += '<div class="uq-reason"><span>' + (r.type === 'Leave' ? 'Reason' : 'Request') + '</span><b>' + esc(r.reason) + '</b></div>';
+    }
+    if (r.reasonNote) out += '<div class="uq-reason"><span>Student wrote</span><p>' + esc(r.reasonNote) + '</p></div>';
+    return out;
+  }
+
+  function rqNoteField(ph) {
+    return '<div class="uq-form uq-form--note"><label>Note to student (optional)' +
+      '<input class="input" type="text" maxlength="300" data-rq-note placeholder="' + esc(ph) + '"></label></div>';
+  }
+
+  function rqPending(r) {
+    var id = esc(r.requestId), acts = '', info = '', ph = '';
+    if (r.type === 'Leave') {
+      info = '<div class="uq-info">Approving makes the account <b>Suspended</b> (note “Left by request”). Nothing is deleted — you can re-activate them later. They get a goodbye email, because a suspended student can no longer sign in to see messages.</div>';
+      ph = 'e.g. Fee for this month is not refundable';
+      acts = '<button class="btn btn--primary btn--sm" type="button" data-act="rq-approve" data-id="' + id + '">Approve &amp; suspend</button>';
+    } else if (r.type === 'Correction') {
+      info = '<div class="uq-info">First fix it yourself: <b>Open student</b> &rarr; <b>Edit details</b>. Then come back and press <b>Mark done</b> — the student is told it was updated.</div>';
+      ph = 'e.g. Updated, thank you';
+      acts = '<button class="btn btn--secondary btn--sm" type="button" data-act="rq-open-student" data-sid="' + esc(r.studentId) + '">Open student</button> ' +
+        '<button class="btn btn--primary btn--sm" type="button" data-act="rq-done" data-id="' + id + '">Mark done</button>';
+    } else {
+      info = '<div class="uq-warn">Two steps. <b>Approve</b> only records your decision. The data is erased later with <b>Delete data now</b> (it appears in the “Waiting for Delete data now” list). Fee and payment records are kept.</div>';
+      ph = 'e.g. We will delete your data today';
+      acts = '<button class="btn btn--primary btn--sm" type="button" data-act="rq-approve" data-id="' + id + '">Approve</button>';
+    }
+    acts += ' <button class="btn btn--quiet btn--sm" type="button" data-act="rq-reject" data-id="' + id + '">Reject</button>';
+    return '<div class="uq-card" data-rqreq="' + id + '" data-type="' + esc(r.type) + '">' + rqHead(r) + rqContact(r) + rqBody(r) + info + rqNoteField(ph) +
+      '<div class="uq-acts">' + acts + '</div></div>';
+  }
+
+  function rqAwaiting(r) {
+    var id = esc(r.requestId);
+    return '<div class="uq-card" data-rqreq="' + id + '" data-type="Deletion">' + rqHead(r) + rqContact(r) + rqBody(r) +
+      '<div class="uq-warn uq-warn--red"><b>Approved ' + esc(fmtDate(r.decidedAt)) + '.</b> Nothing has been deleted yet. ' +
+        '<b>Delete data now</b> permanently removes this student’s name, contact details, PIN, progress, game and chat data (and any linked old/new class account). ' +
+        'Fee and payment records are kept without the name. <b>This cannot be undone.</b></div>' +
+      (r.adminNote ? '<div class="uq-reason"><span>Your note</span><p>' + esc(r.adminNote) + '</p></div>' : '') +
+      '<div class="uq-acts"><button class="btn btn--danger btn--sm" type="button" data-act="rq-anonymise" data-id="' + id + '">Delete data now</button></div></div>';
+  }
+
+  function rqRecent(r) {
+    var badge = r.status === 'Approved' ? '<span class="badge badge--ok">Approved</span>'
+      : r.status === 'Done' ? '<span class="badge badge--ok">Done</span>'
+      : r.status === 'Rejected' ? '<span class="badge badge--bad">Rejected</span>'
+      : '<span class="badge badge--neutral">' + esc(r.status) + '</span>';
+    var d = (r.details && typeof r.details === 'object') ? r.details : {};
+    var what = r.type === 'Correction' && (d.fieldLabel || d.newValue) ? esc(d.fieldLabel || '') + (d.newValue ? ' → ' + esc(d.newValue) : '') : esc(r.reason || '');
+    return '<div class="uq-recent"><div><b>' + esc(r.fullName || '—') + '</b> <span class="uq-id">' + esc(r.studentId) + '</span>' +
+        (what ? '<span class="uq-rr">' + what + (r.reasonNote ? ' — ' + esc(r.reasonNote) : '') + '</span>' : '') +
+        (r.adminNote ? '<small>Note: ' + esc(r.adminNote) + '</small>' : '') + '</div>' +
+      '<div style="text-align:right;">' + badge + '<small>' + esc(fmtDate(r.decidedAt || r.completedAt || r.requestedAt)) + '</small></div></div>';
+  }
+
+  function renderRequests() {
+    var host = qs('#rq-list'); if (!host) return;
+    var cards = qs('#rq-cards'); if (cards) cards.innerHTML = rqCardsHtml();
+    var kind = rqKind || 'Leave';
+    var word = kind === 'Leave' ? 'leave' : kind === 'Correction' ? 'correction' : 'deletion';
+    var byNew = function (a, b) { return rqTime(b.requestedAt) - rqTime(a.requestedAt); };
+    var p = rqData.pending.filter(function (r) { return r.type === kind; }).sort(byNew);
+    var aw = kind === 'Deletion' ? rqData.awaiting.filter(function (r) { return r.type === 'Deletion'; }).sort(byNew) : [];
+    var rc = rqData.recent.filter(function (r) { return r.type === kind; })
+      .sort(function (a, b) { return rqTime(b.decidedAt || b.requestedAt) - rqTime(a.decidedAt || a.requestedAt); });
+    var html = '<div class="stu-sec">Waiting for your decision — ' + word + ' requests (' + p.length + ')</div>';
+    html += p.length ? p.map(rqPending).join('') : '<p class="muted">No ' + word + ' requests waiting right now.</p>';
+    if (kind === 'Deletion') {
+      html += '<div class="stu-sec" style="margin-top:20px;">Waiting for “Delete data now” (' + aw.length + ')</div>';
+      html += aw.length ? aw.map(rqAwaiting).join('') : '<p class="muted">Nothing approved is waiting to be erased.</p>';
+    }
+    html += '<div class="stu-sec" style="margin-top:20px;">History — ' + word + ' requests (' + rc.length + ')</div>';
+    html += rc.length ? rc.map(rqRecent).join('') : '<p class="muted">No ' + word + ' request has been finished yet.</p>';
+    host.innerHTML = html;
+  }
+
+  function rqFind(id) {
+    var all = rqData.pending.concat(rqData.awaiting);
+    for (var i = 0; i < all.length; i++) if (all[i].requestId === id) return all[i];
+    return null;
+  }
+  function rqCardOf(id) {
+    var cs = qsa('#rq-list .uq-card');
+    for (var i = 0; i < cs.length; i++) if (cs[i].getAttribute('data-rqreq') === id) return cs[i];
+    return null;
+  }
+  function rqNoteOf(id) {
+    var c = rqCardOf(id), el = c ? c.querySelector('[data-rq-note]') : null;
+    return el ? el.value.trim() : '';
+  }
+  function rqAfter() {
+    loadRequests();
+    try { if (typeof refresh === 'function') refresh(); } catch (e) { /* student list is optional */ }
+  }
+  function rqSend(r, action, btn, okMsg, errMsg) {
+    busy(btn, true);
+    authed('admin/requests/resolve', { requestId: r.requestId, action: action, note: rqNoteOf(r.requestId) })
+      .then(function () { toast(okMsg, 'ok'); rqAfter(); })
+      .catch(function (e) { busy(btn, false); fail(e, errMsg); if (e && /already handled/i.test(e.message || '')) loadRequests(); });
+  }
+
+  function rqApprove(id, btn) {
+    var r = rqFind(id); if (!r) return;
+    var who = (r.fullName || r.studentId);
+    var msg = r.type === 'Leave'
+      ? 'Approve the leave request from ' + who + '?\n\nTheir account becomes Suspended ("Left by request"). Nothing is deleted. They get a goodbye email.'
+      : 'Approve the data deletion request from ' + who + '?\n\nNothing is erased yet — the request moves to "Waiting for Delete data now".';
+    if (!window.confirm(msg)) return;
+    rqSend(r, 'approve', btn, r.type === 'Leave' ? who + ' is now suspended.' : 'Approved — press Delete data now when you are ready.', 'Could not approve this request.');
+  }
+  function rqDone(id, btn) {
+    var r = rqFind(id); if (!r) return;
+    if (!window.confirm('Mark this correction as done?\n\nOnly press this after you changed the information in Edit details. ' + (r.fullName || r.studentId) + ' is told it was updated.')) return;
+    rqSend(r, 'done', btn, 'Marked done.', 'Could not mark this request done.');
+  }
+  function rqReject(id, btn) {
+    var r = rqFind(id); if (!r) return;
+    var hasNote = !!rqNoteOf(id);
+    if (!window.confirm('Reject the ' + r.type.toLowerCase() + ' request from ' + (r.fullName || r.studentId) + '?\n\nThey are told it was not approved' +
+      (hasNote ? ', with your note.' : '. (Type a note first if you want them to know why.)'))) return;
+    rqSend(r, 'reject', btn, 'Request rejected.', 'Could not reject this request.');
+  }
+  function rqAnonymise(id, btn) {
+    var r = rqFind(id); if (!r) return;
+    var who = r.fullName || r.studentId;
+    var typed = window.prompt('PERMANENT: this erases ' + who + ' (' + r.studentId + ') — name, contact, PIN, progress, games and chats, including any linked old/new class account.\nFee and payment records stay without the name.\n\nType DELETE to continue:');
+    if (typed == null) return;
+    if (String(typed).trim() !== 'DELETE') { toast('Not deleted — you did not type DELETE.', 'warn'); return; }
+    busy(btn, true);
+    authed('admin/requests/anonymise', { requestId: id, confirm: true })
+      .then(function (d) {
+        var n = d && d.accounts ? d.accounts : 1;
+        toast('Data deleted (' + n + ' account' + (n === 1 ? '' : 's') + '). Request marked done.', 'ok');
+        rqAfter();
+      })
+      .catch(function (e) { busy(btn, false); fail(e, 'Could not delete the data. It was NOT marked done — you can press the button again.'); loadRequests(); });
+  }
+
+  function wireRequests() {
+    var panel = qs('[data-panel="requests"]'); if (!panel) return;
+    panel.addEventListener('click', function (e) {
+      var b = e.target.closest ? e.target.closest('[data-act]') : null; if (!b) return;
+      var a = b.getAttribute('data-act');
+      if (a === 'rq-refresh') return loadRequests();
+      if (a === 'rq-pick') { var k = b.getAttribute('data-kind'); rqKind = (k === 'Correction' || k === 'Deletion') ? k : 'Leave'; return renderRequests(); }
+      if (a === 'rq-approve') return rqApprove(b.getAttribute('data-id'), b);
+      if (a === 'rq-done') return rqDone(b.getAttribute('data-id'), b);
+      if (a === 'rq-reject') return rqReject(b.getAttribute('data-id'), b);
+      if (a === 'rq-anonymise') return rqAnonymise(b.getAttribute('data-id'), b);
+      if (a === 'rq-open-student') {
+        var sid = b.getAttribute('data-sid') || '';
+        showView('students');
+        var inp = qs('#f-query'); if (inp) inp.value = sid;
+        runSearch(sid, null);
+      }
+    });
+  }
+
   // ------------------------------------------------------------------- init
   wireUpgrades();
+  wireRequests();
   wirePapers();
   wireGrading();
   wireTeachers();
