@@ -605,6 +605,20 @@ select.input { appearance: auto; background: var(--surface); }
 .rq-change { margin: 8px 0; padding: 9px 11px; border-radius: 10px; background: #eef2ff; border: 1px solid #c7d2fe; font-size: .9rem; line-height: 1.5; overflow-wrap: anywhere; }
 .rq-change span { display: block; font-size: .72rem; color: #4338ca; text-transform: uppercase; letter-spacing: .05em; font-weight: 700; }
 .uq-warn--red { background: #fee2e2; color: #991b1b; }
+.rq-ctable { width: 100%; border-collapse: collapse; margin: 8px 0; font-size: .9rem; }
+.rq-ctable th { text-align: left; font-size: .72rem; color: #4338ca; text-transform: uppercase; letter-spacing: .05em; padding: 6px 10px; }
+.rq-ctable td { padding: 8px 10px; border-top: 1px solid #c7d2fe; vertical-align: top; overflow-wrap: anywhere; }
+.rq-ctable td:first-child { font-weight: 700; white-space: nowrap; }
+.rq-ctable td.is-new { font-weight: 800; color: #0f172a; }
+.rq-ctable td.is-old { color: #64748b; }
+.rq-ctable-wrap { border: 1px solid #c7d2fe; background: #eef2ff; border-radius: 10px; overflow-x: auto; margin: 8px 0; }
+.rq-ctable-wrap .rq-ctable { margin: 0; }
+.rq-edit-banner { margin: 0 0 12px; padding: 10px 12px; border-radius: 10px; background: #eef2ff; border: 1.5px solid #4f46e5; font-size: .88rem; line-height: 1.5; }
+.rq-edit-banner ul { margin: 6px 0; padding-left: 1.1rem; list-style: disc; }
+.rq-edit-banner li { margin: 3px 0; overflow-wrap: anywhere; }
+.rq-edit-banner .btn { margin-left: 6px; }
+.stu-edit__row--req { outline: 2px solid #4f46e5; outline-offset: 2px; border-radius: 8px; background: #eef2ff; }
+.stu-edit__ask { display: block; grid-column: 1 / -1; font-size: .78rem; color: #4338ca; font-weight: 700; margin-top: 4px; }
 .btn--danger { background: #b91c1c; border-color: #b91c1c; color: #fff; }
 .btn--danger:hover { background: #991b1b; }
 .pc-card--leave.is-on { border-color: #b45309; box-shadow: 0 8px 22px rgba(180,83,9,.14); }
@@ -2164,6 +2178,9 @@ window.WHAAdminRecheckBridge = {
     var card = findCardByKey(key); if (!card) return;
     card.classList.add('is-open');
     var body = card.querySelector('.stu-body'); if (body) body.innerHTML = stuEditForm(s, key);
+    // If this student has a waiting correction request, show it inside the form.
+    if (rqLoaded) rqDecorateEdit(card, s);
+    else loadRequests(true).then(function () { rqDecorateEdit(card, s); });
   }
   function cancelStuEdit(key){
     var s = findStudentByKey(key), card = findCardByKey(key);
@@ -2188,7 +2205,8 @@ window.WHAAdminRecheckBridge = {
     busy(btn, true);
     authed('admin/updateEnrollment', { key: key, patch: patch })
       .then(function(d){
-        toast('Changes saved.', 'ok');
+        toast(d && d.requestResolved ? 'Changes saved — the student was told what changed.' : 'Changes saved.', 'ok');
+        if (d && d.requestResolved) { rqLoaded = false; refreshRqBadge(); }
         var un = d && d.unmappedSubjects;
         if (un && un.length) toast('Note: these subjects are not recognized for game unlocking: ' + un.join(', '), 'warn');
         refresh();
@@ -2800,6 +2818,7 @@ window.WHAAdminRecheckBridge = {
     loadStats();
     refreshUpBadge();
     refreshRqBadge();
+    startRqPoll();
     startPresencePoll();
   }
 
@@ -4594,11 +4613,14 @@ window.WHAAdminRecheckBridge = {
       .catch(function () { /* ignore */ });
   }
 
-  function loadRequests() {
+  var rqLoaded = false;
+  function loadRequests(silent) {
     var host = qs('#rq-list'); if (!host) return;
-    host.innerHTML = '<p class="muted">Loading…</p>';
+    if (!silent) host.innerHTML = '<p class="muted">Loading…</p>';
     return authed('admin/requests/list', {})
       .then(function (d) {
+        var keep = silent ? rqCaptureNotes() : null;
+        rqLoaded = true;
         rqData = {
           pending: (d && d.pending) || [], awaiting: (d && d.awaiting) || [],
           recent: (d && d.recent) || [], counts: (d && d.counts) || {}
@@ -4611,9 +4633,57 @@ window.WHAAdminRecheckBridge = {
             : ((c.Deletion || 0) + (c.awaitingDeletion || 0)) ? 'Deletion' : 'Leave';
         }
         renderRequests();
+        if (keep) rqRestoreNotes(keep);
       })
-      .catch(function (e) { host.innerHTML = ''; fail(e, 'Could not load requests.'); });
+      .catch(function (e) { if (silent) return; host.innerHTML = ''; fail(e, 'Could not load requests.'); });
   }
+
+  // A live refresh must not wipe a note the admin is typing.
+  function rqCaptureNotes() {
+    var out = { notes: {}, focus: null };
+    qsa('#rq-list .uq-card').forEach(function (c) {
+      var el = c.querySelector('[data-rq-note]'); if (!el) return;
+      var id = c.getAttribute('data-rqreq');
+      if (el.value) out.notes[id] = el.value;
+      if (document.activeElement === el) out.focus = { id: id, pos: el.selectionStart };
+    });
+    return out;
+  }
+  function rqRestoreNotes(keep) {
+    qsa('#rq-list .uq-card').forEach(function (c) {
+      var id = c.getAttribute('data-rqreq'), el = c.querySelector('[data-rq-note]');
+      if (!el || keep.notes[id] == null) return;
+      el.value = keep.notes[id];
+      if (keep.focus && keep.focus.id === id) { el.focus(); try { el.setSelectionRange(keep.focus.pos, keep.focus.pos); } catch (e) { /* ignore */ } }
+    });
+  }
+
+  // Live updates: a tiny count is asked every 15 s. A new request shows up (badge + toast), and the open
+  // Requests list refreshes itself when something changed - no manual Refresh needed.
+  var rqSig = '', rqLatest = '', rqTimer = null;
+  function rqPoll() {
+    if (document.hidden || !getToken()) return;
+    authed('admin/requests/count', {})
+      .then(function (c) {
+        if (!c) return;
+        var total = Number(c.total) || 0, sig = [c.Leave, c.Correction, c.Deletion, c.awaitingDeletion].join('.');
+        setRqBadge(total);
+        if (rqSig && sig !== rqSig) {
+          if (c.latestAt && rqLatest && String(c.latestAt) > rqLatest) toast('New request received.', 'ok');
+          var panel = qs('[data-panel="requests"]');
+          if (panel && !panel.hidden) loadRequests(true); else rqLoaded = false;
+        }
+        rqSig = sig; if (c.latestAt) rqLatest = String(c.latestAt); else if (!rqLatest) rqLatest = '0';
+      })
+      .catch(function () { /* quiet: the next tick tries again */ });
+  }
+  function startRqPoll() {
+    if (rqTimer) clearInterval(rqTimer);
+    rqSig = ''; rqLatest = '';
+    rqPoll();
+    rqTimer = setInterval(rqPoll, 15000);
+  }
+  document.addEventListener('visibilitychange', function () { if (!document.hidden) rqPoll(); });
 
   function rqTime(iso) { var t = Date.parse(iso || ''); return isNaN(t) ? 0 : t; }
 
@@ -4639,7 +4709,7 @@ window.WHAAdminRecheckBridge = {
     return '<div class="uq-top">' +
         '<div class="uq-name">' + esc(r.fullName || '—') + ' <span class="uq-id">' + esc(r.studentId) + '</span>' +
           (r.classLevel ? ' <span class="badge badge--neutral">Class ' + esc(r.classLevel) + '</span>' : '') + '</div>' +
-        '<div class="uq-when">Requested ' + esc(fmtDate(r.requestedAt)) + '</div>' +
+        '<div class="uq-when">Ref ' + esc(rqShortRef(r.requestId)) + ' &middot; Requested ' + esc(fmtDate(r.requestedAt)) + '</div>' +
       '</div>' +
       '<div class="uq-change"><span class="uq-kind uq-kind--up">' + esc(kindWord) + '</span></div>';
   }
@@ -4656,11 +4726,23 @@ window.WHAAdminRecheckBridge = {
       '<span>Account: <b>' + esc(c.accountStatus || '—') + '</b></span></div>';
   }
 
-  function rqBody(r) {
+  // The corrections a request asks for - new shape (changes[]) and the older single-field shape.
+  function rqChangesOf(r) {
     var d = (r.details && typeof r.details === 'object') ? r.details : {};
+    if (Array.isArray(d.changes)) return d.changes;
+    if (d.field || d.newValue) return [{ field: d.field, label: d.fieldLabel || r.reason, current: '', newValue: d.newValue }];
+    return [];
+  }
+  function rqShortRef(id) { return 'RQ-' + String(id || '').replace(/^REQ-/, '').slice(0, 8).toUpperCase(); }
+
+  function rqBody(r) {
     var out = '';
     if (r.type === 'Correction') {
-      out += '<div class="rq-change"><span>Wants this changed</span><b>' + esc(d.fieldLabel || r.reason || '—') + '</b> &rarr; ' + esc(d.newValue || '—') + '</div>';
+      var ch = rqChangesOf(r);
+      out += '<div class="rq-ctable-wrap"><table class="rq-ctable"><thead><tr><th>What is wrong</th><th>Now</th><th>Should be</th></tr></thead><tbody>' +
+        ch.map(function (c) {
+          return '<tr><td>' + esc(c.label || c.field) + '</td><td class="is-old">' + (c.current ? esc(c.current) : '—') + '</td><td class="is-new">' + esc(c.newValue) + '</td></tr>';
+        }).join('') + '</tbody></table></div>';
     } else if (r.reason) {
       out += '<div class="uq-reason"><span>' + (r.type === 'Leave' ? 'Reason' : 'Request') + '</span><b>' + esc(r.reason) + '</b></div>';
     }
@@ -4680,7 +4762,7 @@ window.WHAAdminRecheckBridge = {
       ph = 'e.g. Fee for this month is not refundable';
       acts = '<button class="btn btn--primary btn--sm" type="button" data-act="rq-approve" data-id="' + id + '">Approve &amp; suspend</button>';
     } else if (r.type === 'Correction') {
-      info = '<div class="uq-info">First fix it yourself: <b>Open student</b> &rarr; <b>Edit details</b>. Then come back and press <b>Mark done</b> — the student is told it was updated.</div>';
+      info = '<div class="uq-info">Press <b>Open student</b>: the things the student asked for are highlighted in <b>Edit details</b>. Change them and <b>Save</b> — the request closes by itself and the student is told exactly what changed. Use <b>Mark done</b> only if you fixed it some other way.</div>';
       ph = 'e.g. Updated, thank you';
       acts = '<button class="btn btn--secondary btn--sm" type="button" data-act="rq-open-student" data-sid="' + esc(r.studentId) + '">Open student</button> ' +
         '<button class="btn btn--primary btn--sm" type="button" data-act="rq-done" data-id="' + id + '">Mark done</button>';
@@ -4709,8 +4791,9 @@ window.WHAAdminRecheckBridge = {
       : r.status === 'Done' ? '<span class="badge badge--ok">Done</span>'
       : r.status === 'Rejected' ? '<span class="badge badge--bad">Rejected</span>'
       : '<span class="badge badge--neutral">' + esc(r.status) + '</span>';
-    var d = (r.details && typeof r.details === 'object') ? r.details : {};
-    var what = r.type === 'Correction' && (d.fieldLabel || d.newValue) ? esc(d.fieldLabel || '') + (d.newValue ? ' → ' + esc(d.newValue) : '') : esc(r.reason || '');
+    var what = r.type === 'Correction'
+      ? rqChangesOf(r).map(function (c) { return esc(c.label || c.field) + ' → ' + esc(c.newValue); }).join('; ')
+      : esc(r.reason || '');
     return '<div class="uq-recent"><div><b>' + esc(r.fullName || '—') + '</b> <span class="uq-id">' + esc(r.studentId) + '</span>' +
         (what ? '<span class="uq-rr">' + what + (r.reasonNote ? ' — ' + esc(r.reasonNote) : '') + '</span>' : '') +
         (r.adminNote ? '<small>Note: ' + esc(r.adminNote) + '</small>' : '') + '</div>' +
@@ -4815,8 +4898,58 @@ window.WHAAdminRecheckBridge = {
         var sid = b.getAttribute('data-sid') || '';
         showView('students');
         var inp = qs('#f-query'); if (inp) inp.value = sid;
-        runSearch(sid, null);
+        Promise.resolve(runSearch(sid, null)).then(function () { openStuEdit(sid); });
       }
+    });
+    document.addEventListener('click', function (e) {
+      var b = e.target.closest ? e.target.closest('[data-act="rq-use"]') : null; if (!b) return;
+      rqUseValue(b.getAttribute('data-rqf'), b.getAttribute('data-rqv'));
+    });
+  }
+
+  // ---- Edit details: show what the student asked for, right where the admin edits ----
+  function rqUseValue(field, value) {
+    var ed = qs('.stu-edit'); if (!ed) return;
+    var el = ed.querySelector('input[data-field="' + String(field).replace(/"/g, '') + '"], select[data-field="' + String(field).replace(/"/g, '') + '"]');
+    if (!el) { toast('Set this one by hand in the form.', 'warn'); return; }
+    if (el.tagName === 'SELECT') {
+      var want = String(value).trim().toLowerCase(), digits = (/\d+/.exec(want) || [''])[0], hit = null;
+      Array.prototype.forEach.call(el.options, function (o) {
+        var v = String(o.value).toLowerCase(), t = String(o.text).toLowerCase();
+        if (!hit && (v === want || t === want || (field === 'classLevel' && digits && v === digits))) hit = o;
+      });
+      if (!hit) { toast('Pick this one from the list.', 'warn'); return; }
+      el.value = hit.value;
+      el.dispatchEvent(new Event('change', { bubbles: true }));
+    } else {
+      el.value = value;
+      el.dispatchEvent(new Event('input', { bubbles: true }));
+    }
+    toast('Filled in — check it and press Save changes.', 'ok');
+  }
+  function rqDecorateEdit(card, student) {
+    var ed = card && card.querySelector('.stu-edit'); if (!ed || ed.getAttribute('data-rq-done')) return;
+    var sid = String((student && student.studentId) || '');
+    var req = null;
+    rqData.pending.forEach(function (r) { if (!req && r.type === 'Correction' && String(r.studentId) === sid) req = r; });
+    if (!req) return;
+    ed.setAttribute('data-rq-done', '1');
+    var ch = rqChangesOf(req);
+    var items = ch.map(function (c) {
+      var simple = c.field && c.field !== 'other' && c.field !== 'subjects';
+      return '<li><b>' + esc(c.label || c.field) + ':</b> ' + (c.current ? esc(c.current) + ' → ' : '') + '<b>' + esc(c.newValue) + '</b>' +
+        (simple ? '<button class="btn btn--quiet btn--sm" type="button" data-act="rq-use" data-rqf="' + esc(c.field) + '" data-rqv="' + esc(c.newValue) + '">Fill in</button>' : '') + '</li>';
+    }).join('');
+    ed.insertAdjacentHTML('afterbegin', '<div class="rq-edit-banner"><b>The student asked for these corrections</b> (' + esc(rqShortRef(req.requestId)) + ')<ul>' + items + '</ul>' +
+      (req.reasonNote ? '<div>Note: ' + esc(req.reasonNote) + '</div>' : '') +
+      '<div>When you press <b>Save changes</b>, this request closes and the student is told exactly what changed.</div></div>');
+    ch.forEach(function (c) {
+      if (!c.field || c.field === 'other') return;
+      var el = c.field === 'subjects' ? ed.querySelector('.ed-dynamic') : ed.querySelector('input[data-field="' + String(c.field).replace(/"/g, '') + '"], select[data-field="' + String(c.field).replace(/"/g, '') + '"]');
+      var row = el && (el.closest ? el.closest('.stu-edit__row') : null) || el;
+      if (!row) return;
+      row.classList.add('stu-edit__row--req');
+      row.insertAdjacentHTML('beforeend', '<span class="stu-edit__ask">Student asked: ' + esc(c.newValue) + '</span>');
     });
   }
 
