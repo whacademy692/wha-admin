@@ -297,6 +297,10 @@ th:first-child, td:first-child { min-width: 15rem; }
 
 .muted { color: var(--muted); }
 .count { margin-top: 0.5rem; font-size: 0.8125rem; color: var(--muted); }
+.ol-new { display: flex; gap: .6rem; flex-wrap: wrap; align-items: center; }
+.ol-new .input { flex: 1 1 260px; min-width: 0; }
+.ol-url { font-family: var(--mono); font-size: .75rem; color: var(--muted); word-break: break-all; max-width: 340px; }
+.ol-sub { display: block; font-size: .78rem; color: var(--muted); margin-top: .15rem; }
 
 /* A dot rather than a second badge: "has an account" is a quieter fact than the
    enrollment status beside it, and two badges per row would compete. */
@@ -1009,6 +1013,11 @@ select.input { appearance: auto; background: var(--surface); }
         Fees
         <span class="nav-badge" id="fees-badge" hidden></span>
       </button>
+      <button class="side__item" data-view="olevel" type="button">
+        <svg viewBox="0 0 24 24" stroke-width="2" aria-hidden="true"><path stroke-linecap="round" stroke-linejoin="round" d="M10 14a4 4 0 005.7 0l3-3a4 4 0 00-5.7-5.7l-1 1"/><path stroke-linecap="round" stroke-linejoin="round" d="M14 10a4 4 0 00-5.7 0l-3 3a4 4 0 005.7 5.7l1-1"/></svg>
+        O Level
+        <span class="nav-badge" id="ol-badge" hidden></span>
+      </button>
       <button class="side__item" data-view="papers" type="button">
         <svg viewBox="0 0 24 24" stroke-width="2" aria-hidden="true"><path stroke-linecap="round" stroke-linejoin="round" d="M12 3l7 3v5c0 4.5-3 7.5-7 9-4-1.5-7-4.5-7-9V6l7-3z"/><path stroke-linecap="round" stroke-linejoin="round" d="M9.5 12l1.8 1.8L15 9.8"/></svg>
         Boss Papers
@@ -1148,6 +1157,22 @@ select.input { appearance: auto; background: var(--surface); }
       </header>
       <div id="fees-blocked" aria-live="polite"></div>
       <div id="fees-structure" style="margin-top:28px"></div>
+    </section>
+
+    <section data-panel="olevel" hidden>
+      <header class="head">
+        <div>
+          <h1 class="head__title">Cambridge O Level</h1>
+          <p class="head__sub">Private enrollment links for O Level students. Make a link, copy it and send it to the student. The link&rsquo;s <b>24 hours start when the student first opens it</b>; after that it expires for good and can be used for one enrollment only. The form has no class or board choice &mdash; the student is saved as Cambridge O Level Mathematics (Class 8 fee band; change the class later from Edit details if needed).</p>
+        </div>
+        <button class="btn btn--quiet btn--sm" data-act="ol-refresh" type="button">Refresh</button>
+      </header>
+      <div class="ol-new">
+        <input class="input" type="text" id="ol-label" maxlength="80" placeholder="Who is this link for? (optional, e.g. student name)" autocomplete="off">
+        <button class="btn btn--primary" type="button" data-act="ol-create" id="ol-create">Create new link</button>
+      </div>
+      <p class="count" id="ol-summary" style="margin:.6rem 0 .8rem"></p>
+      <div id="ol-list" aria-live="polite"></div>
     </section>
 
     <section data-panel="overview" hidden>
@@ -1677,7 +1702,7 @@ select.input { appearance: auto; background: var(--surface); }
   // Turnstile token is single-use, and re-sending a write could double-apply.
   var RETRYABLE_OPS = {
     'insights/adminList': 1, 'insights/approved': 1,
-    'admin/statistics': 1, 'admin/searchStudents': 1, 'admin/listTeachers': 1, 'admin/devices': 1,
+    'admin/statistics': 1, 'admin/searchStudents': 1, 'admin/olevelInvite/list': 1, 'admin/listTeachers': 1, 'admin/devices': 1,
     'admin/listPromotions': 1, 'admin/listUpgradeRequests': 1, 'admin/requests/list': 1,
     'bossbattle/admin/listPapers': 1, 'bossbattle/admin/listSubmissions': 1,
     'bossbattle/admin/getPaperForEdit': 1, 'bossbattle/admin/submissionForGrading': 1
@@ -1748,6 +1773,7 @@ window.WHAAdminRecheckBridge = {
     qs('#results').innerHTML = '';
     qs('#stats').innerHTML = '';
     qs('#devices').innerHTML = '';
+    stopOlPoll(); olData = [];
     show('gate');
     // A stale code box would only fail confusingly on the next attempt.
     clearCodeStep();
@@ -2024,6 +2050,7 @@ window.WHAAdminRecheckBridge = {
   };
   // Punjab Board (Sargodha) offers only these two subjects for now (no stream) — mirrors enroll.html.
   ENROLL.subjectsPunjab = ['Mathematics','Chemistry'];
+  ENROLL.subjectsOLevel = ['Mathematics'];   // Cambridge O Level: Mathematics only for now
   function edBandKey(c){ c=Number(c); return c<=8?'low':(c<=10?'matric':'inter'); }
   function edBandName(c){ c=Number(c); return c<=8?'Middle':(c<=10?'Matric':'Intermediate'); }
   function edSubjectsFor(cls, stream){
@@ -2091,37 +2118,43 @@ window.WHAAdminRecheckBridge = {
 
   // Board follows the Class (mirrors enroll.html). Federal is always offered for Class 9-12; KPK and Punjab only for
   // the classes listed in BOARD_CLASSES. KEEP THIS IN SYNC with BOARD_CLASSES in enroll.html.
-  //   Class 6-8: APSACS (fixed) | 9: Federal / Punjab | 10: Federal / KPK / Punjab | 11-12: Federal (fixed)
+  //   Class 6-8: APSACS / Cambridge O Level | 9: Federal / Punjab / O Level | 10: Federal / KPK / Punjab / O Level | 11-12: Federal / O Level
+  // Cambridge O Level ("OLevel", token BOARD-OLEVEL) is offered for EVERY class 6-12; Mathematics only, no stream; the student sees all uploaded O Level books.
   // REMINDER: Punjab Board (Sargodha) exists for Class 9 and 10 ONLY (Mathematics + Chemistry); KPK for Class 10 only.
   var BOARD_CLASSES = { KPK: [10], Punjab: [9, 10] };
-  var BOARD_LABEL = { Federal: 'Federal (FBISE)', KPK: 'KPK', Punjab: 'Punjab \u2014 Sargodha' };
+  var BOARD_LABEL = { Federal: 'Federal (FBISE)', KPK: 'KPK', Punjab: 'Punjab \u2014 Sargodha', APSACS: 'APSACS', OLevel: 'Cambridge O Level' };
   // Ladder rule: a student stays on their board when promoted. So KPK / Punjab are also offered for a HIGHER class
   // than the board's own classes, but only to a student who is already on that board (content for those classes comes later).
   function edBoardChoices(cls, curBoard){
     cls = Number(cls);
+    if (cls <= 8) return ['APSACS', 'OLevel'];
     var out = ['Federal'];
     ['KPK', 'Punjab'].forEach(function(b){
       var min = Math.min.apply(null, BOARD_CLASSES[b]);
       if (BOARD_CLASSES[b].indexOf(cls) !== -1 || (cls > min && String(curBoard || '') === b)) out.push(b);
     });
+    out.push('OLevel');
     return out;
   }
   // The board that will actually be saved for this class: the saved/selected one if it is offered for the class, else Federal.
   function edEffectiveBoard(cls, curBoard){
     cls = Number(cls);
-    if (cls <= 8) return 'APSACS';
+    if (cls <= 8) return String(curBoard || '') === 'OLevel' ? 'OLevel' : 'APSACS';
     return edBoardChoices(cls, curBoard).indexOf(String(curBoard || '')) !== -1 ? String(curBoard) : 'Federal';
   }
   function edBoardFor(cls, curBoard){
     cls = Number(cls);
     var cb = String(curBoard || '');
     if (cls <= 8) {
-      return '<label class="stu-edit__row"><span class="stu-edit__lbl">Board</span><select class="input" data-field="board" disabled><option selected>APSACS</option></select></label>';
+      var effLow = edEffectiveBoard(cls, cb);
+      return '<label class="stu-edit__row"><span class="stu-edit__lbl">Board</span><select class="input" data-field="board">' +
+        edBoardChoices(cls, cb).map(function(b){ return '<option value="' + b + '"' + (b === effLow ? ' selected' : '') + '>' + esc(BOARD_LABEL[b]) + '</option>'; }).join('') + '</select></label>' +
+        '<div class="stu-edit__row"><span class="stu-edit__lbl"></span><small class="muted">Cambridge O Level: Mathematics only; the student sees every uploaded O Level book (Book 1\u20134 / D1\u2013D4) whichever class they are in.</small></div>';
     }
     var eff = edEffectiveBoard(cls, cb), ch = edBoardChoices(cls, cb);
     var warn = (cb && cb !== eff)
       ? '<div class="stu-edit__row"><span class="stu-edit__lbl"></span><small class="ed-fee__warn">The saved board (' + esc(cb) + ') is not offered for Class ' + cls + ' \u2014 it will be saved as ' + esc(eff) + '.</small></div>' : '';
-    var note = '<div class="stu-edit__row"><span class="stu-edit__lbl"></span><small class="muted">Reminder: Punjab Board (Sargodha) content exists for <b>Class 9 and 10 only</b> (Mathematics + Chemistry); KPK Board for Class 10 only. A promoted student stays on their board in higher classes.</small></div>';
+    var note = '<div class="stu-edit__row"><span class="stu-edit__lbl"></span><small class="muted">Reminder: Punjab Board (Sargodha) content exists for <b>Class 9 and 10 only</b> (Mathematics + Chemistry); KPK Board for Class 10 only. <b>Cambridge O Level</b>: any class, Mathematics only. A promoted student stays on their board in higher classes.</small></div>';
     var hidden = '<input type="hidden" data-field="boardBody" value="' + (eff === 'Punjab' ? 'Sargodha' : '') + '">';
     if (ch.length === 1) {
       return '<label class="stu-edit__row"><span class="stu-edit__lbl">Board</span><select class="input" data-field="board" disabled><option selected>Federal</option></select></label>' + hidden + warn + note;
@@ -2132,18 +2165,21 @@ window.WHAAdminRecheckBridge = {
   function edDynamicHtml(cls, cur){
     cur = cur || {};
     var k = edBandKey(cls), band = edBandName(cls);
-    var punjab = (edEffectiveBoard(cls, cur.board) === 'Punjab' && Number(cls) <= 10);   // Punjab Board Class 9-10: no stream, Mathematics + Chemistry only
+    var effBoard = edEffectiveBoard(cls, cur.board);
+    var olevel = (effBoard === 'OLevel');                                                  // Cambridge O Level: no stream, Mathematics only
+    var punjab = (effBoard === 'Punjab' && Number(cls) <= 10) || olevel;                    // Punjab Board Class 9-10: no stream, Mathematics + Chemistry only
     var streamList = punjab ? ['Not applicable'] : ENROLL.streams[k], curStream = punjab ? 'Not applicable' : cur.stream;
     var sOpts = (punjab ? '' : '<option value="">\u2014 Select \u2014</option>') +
       streamList.map(function(x){ return '<option'+(x===curStream?' selected':'')+'>'+esc(x)+'</option>'; }).join('');
     var streamHtml = '<label class="stu-edit__row"><span class="stu-edit__lbl">Stream</span><select class="input" data-field="stream"'+(punjab?' disabled':'')+'>'+sOpts+'</select></label>';
     var chosen = {}; (cur.subjects||[]).forEach(function(x){ chosen[String(x).trim().toLowerCase()]=1; });
-    var subjList = punjab ? ENROLL.subjectsPunjab : edSubjectsFor(cls, cur.stream);
+    var subjList = olevel ? ENROLL.subjectsOLevel : (punjab ? ENROLL.subjectsPunjab : edSubjectsFor(cls, cur.stream));
     // Subjects the student already has that are not in today's list (e.g. an older
     // 11-12 student with Chemistry/Biology) stay visible + ticked, so Save never drops them silently.
     var listed = {}; subjList.forEach(function(x){ listed[x.toLowerCase()]=1; });
     var extraSubs = (cur.subjects||[]).map(function(x){ return String(x).trim(); })
       .filter(function(x){ return x && !listed[x.toLowerCase()]; });
+    if (olevel) extraSubs = [];   // O Level: only Mathematics is offered (other subjects from a previous board are not carried)
     var allSubs = subjList.concat(extraSubs);
     var chips = allSubs.length
       ? allSubs.map(function(sub){ return '<label class="ed-chip"><input type="checkbox" data-subject value="'+esc(sub)+'"'+(chosen[sub.toLowerCase()]?' checked':'')+'><span>'+esc(sub)+'</span></label>'; }).join('')
@@ -2838,6 +2874,7 @@ window.WHAAdminRecheckBridge = {
     if (name === 'papers') loadPapers();
     if (name === 'archived') loadArchived();
     if (name === 'fees') loadFees();
+    if (name === 'olevel') startOlPoll(); else stopOlPoll();
     if (name === 'students') startPresencePoll();
     if (name === 'requests') loadRequests();
   }
@@ -4756,7 +4793,7 @@ window.WHAAdminRecheckBridge = {
         ? ' <a href="https://wa.me/' + esc(digits.replace(/^0/, '92')) + '" target="_blank" rel="noopener noreferrer">open chat</a>' : '') + '</span>' : '';
     return '<div class="rq-contact">' + waHtml +
       (c.email ? '<span>Email: <b>' + esc(c.email) + '</b></span>' : '') +
-      (c.board ? '<span>Board: <b>' + esc(c.board) + '</b></span>' : '') +
+      (c.board ? '<span>Board: <b>' + esc(c.board === 'OLevel' ? 'Cambridge O Level' : c.board) + '</b></span>' : '') +
       '<span>Account: <b>' + esc(c.accountStatus || '—') + '</b></span></div>';
   }
 
@@ -5326,6 +5363,120 @@ window.WHAAdminRecheckBridge = {
       .then(function(d){ toast('Fee structure saved — effective ' + (d.effectiveLabel || 'next month') + '. Students notified.', 'ok'); loadFees(); })
       .catch(function(err){ toast(err.message || 'Failed.', 'bad'); busy(btn, false); });
   }
+  // ==========================================================================
+  // CAMBRIDGE O LEVEL INVITE LINKS — admin makes a private enrollment link, copies it, sends it.
+  // The 24 hours start when the student first opens it (server side); one enrollment per link.
+  // ==========================================================================
+  var olData = [], olTimer = null, olTick = null;
+  function olStatus(v) { return (v.status === 'open' && Date.parse(v.expiresAt) <= Date.now()) ? 'expired' : v.status; }
+  function olLeft(ms) {
+    var m = Math.max(0, Math.floor(ms / 60000)), h = Math.floor(m / 60); m = m % 60;
+    return h > 0 ? h + ' h ' + m + ' min' : m + ' min';
+  }
+  function olBadge(st, v) {
+    if (st === 'waiting') return '<span class="badge badge--neutral">Not opened yet</span>';
+    if (st === 'open') { var lm = Date.parse(v.expiresAt) - Date.now(); return '<span class="badge badge--warn">Opened' + (isNaN(lm) ? '' : ' &mdash; ' + olLeft(lm) + ' left') + '</span>'; }
+    if (st === 'used') return '<span class="badge badge--ok">Form submitted</span>';
+    if (st === 'expired') return '<span class="badge badge--bad">Expired</span>';
+    return '<span class="badge badge--neutral">Cancelled</span>';
+  }
+  function olMessage(url) {
+    return 'Assalam o Alaikum! W.H. Academy — Cambridge O Level Mathematics enrollment form:\n' + url +
+      '\n\nThis link is private. It stays valid for 24 hours after you first open it, so please open it when you are ready to fill the form.';
+  }
+  function olCopy(text, okMsg) {
+    function done() { toast(okMsg, 'ok'); }
+    function legacy() {
+      var ta = document.createElement('textarea'); ta.value = text; ta.setAttribute('readonly', ''); ta.style.position = 'fixed'; ta.style.opacity = '0';
+      document.body.appendChild(ta); ta.select();
+      var okc = false; try { okc = document.execCommand('copy'); } catch (e) { okc = false; }
+      ta.remove(); if (okc) done(); else toast('Could not copy automatically. Select the link and copy it by hand.', 'warn');
+    }
+    if (navigator.clipboard && navigator.clipboard.writeText) navigator.clipboard.writeText(text).then(done, legacy); else legacy();
+  }
+  function renderOlevel() {
+    var host = qs('#ol-list'); if (!host) return;
+    var cnt = { waiting: 0, open: 0, used: 0, expired: 0, revoked: 0 };
+    olData.forEach(function (v) { cnt[olStatus(v)] = (cnt[olStatus(v)] || 0) + 1; });
+    var sum = qs('#ol-summary'); if (sum) sum.textContent = olData.length ? (cnt.waiting + ' not opened · ' + cnt.open + ' open · ' + cnt.used + ' submitted · ' + cnt.expired + ' expired · ' + cnt.revoked + ' cancelled') : '';
+    var bd = qs('#ol-badge'); if (bd) { var live = cnt.waiting + cnt.open; bd.hidden = !live; bd.textContent = String(live); }
+    if (!olData.length) {
+      host.innerHTML = '<div class="empty"><h2>No links yet</h2><p>Press &ldquo;Create new link&rdquo;, copy it and send it to the student.</p></div>';
+      return;
+    }
+    var rows = olData.map(function (v) {
+      var st = olStatus(v);
+      var who = st === 'used'
+        ? '<div class="cell-name">' + esc(v.studentName || '—') + '</div><div class="cell-sub cell-id">' + esc(v.studentId || '') + '</div>'
+        : '<span class="muted">—</span>';
+      var acts = '';
+      if (st === 'waiting' || st === 'open') {
+        acts += '<button class="btn btn--primary btn--sm" data-act="ol-copy" data-token="' + esc(v.token) + '">Copy link</button> ' +
+                '<button class="btn btn--secondary btn--sm" data-act="ol-copymsg" data-token="' + esc(v.token) + '">Copy message</button> ' +
+                '<button class="btn btn--quiet btn--sm" data-act="ol-revoke" data-token="' + esc(v.token) + '">Cancel</button>';
+      } else if (st === 'expired' || st === 'revoked') {
+        acts += '<button class="btn btn--primary btn--sm" data-act="ol-renew" data-token="' + esc(v.token) + '">New link</button>';
+      }
+      return '<tr>' +
+        '<td><div class="cell-name">' + esc(v.label || 'No label') + '</div>' +
+          (st === 'waiting' || st === 'open' ? '<div class="ol-url">' + esc(v.url) + '</div>' : '<div class="cell-sub">Created ' + esc(fmtDate(v.createdAt)) + '</div>') + '</td>' +
+        '<td>' + olBadge(st, v) + '</td>' +
+        '<td>' + (v.openedAt ? esc(fmtDate(v.openedAt)) : '<span class="muted">Not opened</span>') + '</td>' +
+        '<td>' + (v.expiresAt ? esc(fmtDate(v.expiresAt)) : '<span class="muted">Starts when opened</span>') + (st === 'used' ? '<span class="ol-sub">Submitted ' + esc(fmtDate(v.usedAt)) + '</span>' : '') + '</td>' +
+        '<td>' + who + '</td>' +
+        '<td class="cell-act">' + acts + '</td></tr>';
+    }).join('');
+    host.innerHTML = '<div class="table-wrap"><table><thead><tr><th>Link</th><th>Status</th><th>Opened</th><th>Expires</th><th>Student</th><th></th></tr></thead><tbody>' + rows + '</tbody></table></div>' +
+      '<p class="count">' + olData.length + ' link' + (olData.length === 1 ? '' : 's') + ' · refreshes by itself every 15 seconds</p>';
+  }
+  function loadOlevel(quiet) {
+    return authed('admin/olevelInvite/list', {})
+      .then(function (d) { olData = (d && d.invites) || []; renderOlevel(); })
+      .catch(function (e) { if (!quiet) fail(e, 'Could not load the O Level links.'); });
+  }
+  function startOlPoll() {
+    stopOlPoll(); loadOlevel(false);
+    olTimer = setInterval(function () { if (!document.hidden) loadOlevel(true); }, 15000);
+    olTick = setInterval(function () { if (!document.hidden) renderOlevel(); }, 30000);
+  }
+  function stopOlPoll() { if (olTimer) { clearInterval(olTimer); olTimer = null; } if (olTick) { clearInterval(olTick); olTick = null; } }
+  document.addEventListener('visibilitychange', function () {
+    var p = qs('[data-panel="olevel"]'); if (!document.hidden && p && !p.hidden) loadOlevel(true);
+  });
+  function olFind(token) { for (var i = 0; i < olData.length; i++) if (olData[i].token === token) return olData[i]; return null; }
+  function olCreate(label, btn) {
+    busy(btn, true);
+    return authed('admin/olevelInvite/create', { label: label || '' })
+      .then(function (v) {
+        var inp = qs('#ol-label'); if (inp) inp.value = '';
+        olData.unshift(v); renderOlevel();
+        olCopy(v.url, 'New link created and copied. Send it to the student.');
+      })
+      .catch(function (e) { fail(e, 'Could not create the link.'); })
+      .then(function () { busy(btn, false); });
+  }
+  (function wireOlevel() {
+    var panel = qs('[data-panel="olevel"]'); if (!panel) return;
+    panel.addEventListener('click', function (e) {
+      var b = e.target.closest ? e.target.closest('[data-act]') : null; if (!b) return;
+      var a = b.getAttribute('data-act'), v = olFind(b.getAttribute('data-token'));
+      if (a === 'ol-refresh') return loadOlevel(false);
+      if (a === 'ol-create') return olCreate((qs('#ol-label') || {}).value, b);
+      if (a === 'ol-copy' && v) return olCopy(v.url, 'Link copied.');
+      if (a === 'ol-copymsg' && v) return olCopy(olMessage(v.url), 'Message with the link copied.');
+      if (a === 'ol-renew' && v) return olCreate(v.label, b);
+      if (a === 'ol-revoke' && v) {
+        if (!window.confirm('Cancel this link? The student will not be able to use it.')) return;
+        busy(b, true);
+        return authed('admin/olevelInvite/revoke', { inviteToken: v.token })
+          .then(function () { toast('Link cancelled.', 'ok'); return loadOlevel(true); })
+          .catch(function (err) { fail(err, 'Could not cancel the link.'); busy(b, false); });
+      }
+    });
+    var lbl = qs('#ol-label');
+    if (lbl) lbl.addEventListener('keydown', function (e) { if (e.key === 'Enter') { e.preventDefault(); olCreate(lbl.value, qs('#ol-create')); } });
+  })();
+
   // Fees-view click handling + online-checkbox toggle
   (function wireFees(){
     var feesPanel = qs('[data-panel="fees"]');
