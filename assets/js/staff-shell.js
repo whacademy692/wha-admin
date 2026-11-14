@@ -62,7 +62,7 @@
       :root{--wha-staff-sidebar-w:248px}
       .wha-staff-sidebar{box-sizing:border-box!important;width:248px!important;height:100vh!important;position:fixed!important;inset:0 auto 0 0!important;z-index:999!important;display:flex!important;flex-direction:column!important;overflow-y:auto!important;padding:22px 14px 18px!important;color:#fff!important;background:radial-gradient(circle at 90% 3%,rgba(255,255,255,.2),transparent 28%),linear-gradient(165deg,#312e81,#4338ca 55%,#7c3aed 120%)!important;border-right:1px solid rgba(255,255,255,.16)!important;box-shadow:18px 0 42px rgba(49,46,129,.18)!important}
       .wha-staff-brand{display:grid;grid-template-columns:46px 1fr;gap:11px;align-items:center;padding:10px;margin-bottom:16px;border:1px solid rgba(255,255,255,.16);border-radius:16px;background:rgba(255,255,255,.09)}
-      .wha-staff-brand__mark{width:46px;height:46px;display:grid;place-items:center;border-radius:13px;font:900 15px/1 system-ui;background:rgba(255,255,255,.15);border:1px solid rgba(255,255,255,.2)}
+      .wha-staff-brand__mark{width:46px;height:46px;display:grid;place-items:center;border-radius:50%;overflow:hidden;font:900 15px/1 system-ui;background:rgba(255,255,255,.15);border:1px solid rgba(255,255,255,.2)}
       .wha-staff-brand__title{font:800 15px/1.15 system-ui}.wha-staff-brand__role{display:block;margin-top:4px;font:700 10px/1.2 system-ui;letter-spacing:.12em;text-transform:uppercase;color:rgba(255,255,255,.66)}
       .wha-staff-sidebar__nav{display:flex;flex-direction:column;gap:7px}
       .wha-staff-nav-item,.wha-admin-sidebar [data-wha-staff-nav]{width:100%!important;min-height:46px!important;display:flex!important;align-items:center!important;gap:11px!important;padding:10px 12px!important;border:1px solid transparent!important;border-radius:12px!important;color:rgba(255,255,255,.9)!important;background:transparent!important;font:700 14px/1.25 system-ui!important;text-decoration:none!important;cursor:pointer!important}
@@ -78,7 +78,7 @@
   function brand(role) {
     const x = document.createElement('div');
     x.className = 'wha-staff-brand';
-    x.innerHTML = '<div class="wha-staff-brand__mark">WH</div><div><div class="wha-staff-brand__title">W.H. Academy</div><span class="wha-staff-brand__role">'+role+'</span></div>';
+    x.innerHTML = '<div class="wha-staff-brand__mark"><img src="assets/favicon-192.png" width="46" height="46" alt="" style="width:100%;height:100%;object-fit:contain;border-radius:50%;background:#fff;display:block"></div><div><div class="wha-staff-brand__title">W.H. Academy</div><span class="wha-staff-brand__role">'+role+'</span></div>';
     return x;
   }
   function navButton(label, icon) {

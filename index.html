@@ -4,6 +4,9 @@
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
 <title>Admin — W.H. Academy</title>
+<link rel="icon" type="image/png" sizes="48x48" href="assets/favicon-48.png">
+<link rel="icon" type="image/png" sizes="192x192" href="assets/favicon-192.png">
+<link rel="apple-touch-icon" href="assets/favicon-192.png">
 <meta name="theme-color" content="#3730a3">
 <meta name="robots" content="noindex, nofollow">
 <!-- Audit S2: per-page CSP. frame-ancestors 'none' stops this admin panel from
@@ -204,8 +207,9 @@ button, input { font: inherit; color: inherit; }
   box-shadow: var(--shadow-lg);
 }
 
-.gate__brand { display: flex; flex-direction: column; gap: 0.1rem; margin-bottom: 1.25rem; }
-.gate__mark  { font-size: 1.25rem; font-weight: 700; color: var(--brand-deep); }
+.gate__brand { display: flex; flex-direction: column; align-items: center; text-align: center; gap: 0.3rem; margin-bottom: 1.25rem; }
+.gate__logo  { display: block; width: 104px; height: 104px; object-fit: contain; margin-bottom: 0.25rem; }
+.gate__mark  { font-size: 1.35rem; font-weight: 800; letter-spacing: 0.16em; text-transform: uppercase; color: var(--brand-deep); }
 .gate__sub   { font-size: 0.75rem; letter-spacing: 0.14em; text-transform: uppercase; color: var(--faint); }
 .gate__note  { margin: 1rem 0 0; font-size: 0.8125rem; line-height: 1.5; color: var(--muted); }
 
@@ -220,7 +224,8 @@ button, input { font: inherit; color: inherit; }
   color: rgba(255,255,255,0.82);
 }
 
-.side__brand { display: flex; flex-direction: column; gap: 0.1rem; padding: 0 0.5rem; color: #fff; }
+.side__brand { display: grid; grid-template-columns: auto 1fr; column-gap: 0.65rem; align-items: center; padding: 0 0.5rem; color: #fff; }
+.side__logo  { grid-row: 1 / span 2; width: 40px; height: 40px; object-fit: contain; background: #fff; border-radius: 50%; padding: 2px; }
 .side__name  { font-size: 1.0625rem; font-weight: 700; line-height: 1.25; }
 .side__tag   { font-size: 0.6875rem; letter-spacing: 0.16em; text-transform: uppercase; color: rgba(255,255,255,0.55); }
 
@@ -911,6 +916,7 @@ select.input { appearance: auto; background: var(--surface); }
 <section id="gate" class="gate" hidden>
   <div class="gate__card">
     <div class="gate__brand">
+      <img class="gate__logo" src="assets/logo-512.png" width="104" height="104" alt="W.H. Academy logo">
       <span class="gate__mark">W.H. Academy</span>
       <span class="gate__sub">Administration</span>
     </div>
@@ -974,6 +980,7 @@ select.input { appearance: auto; background: var(--surface); }
 
   <aside class="side">
     <div class="side__brand">
+      <img class="side__logo" src="assets/favicon-192.png" width="40" height="40" alt="">
       <span class="side__name">W.H. Academy</span>
       <span class="side__tag">Admin</span>
     </div>

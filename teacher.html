@@ -5,6 +5,9 @@
 <meta http-equiv="Content-Security-Policy" content="default-src 'self'; base-uri 'self'; object-src 'none'; frame-ancestors 'none'; script-src 'self' 'unsafe-inline'; style-src 'self' 'unsafe-inline' https://fonts.googleapis.com; img-src 'self' data:; font-src 'self' https://fonts.gstatic.com; connect-src 'self' https://gbgcaonmdekumluwgwvn.supabase.co https://script.google.com https://script.googleusercontent.com">
 <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
 <title>Teacher — W.H. Academy</title>
+<link rel="icon" type="image/png" sizes="48x48" href="assets/favicon-48.png">
+<link rel="icon" type="image/png" sizes="192x192" href="assets/favicon-192.png">
+<link rel="apple-touch-icon" href="assets/favicon-192.png">
 <link rel="stylesheet" href="assets/vendor/katex/katex.min.css"><script src="assets/vendor/katex/katex.min.js"></script><script src="assets/js/katex-render.js"></script><link rel="stylesheet" href="assets/vendor/mathlive/mathlive-static.css"><script src="assets/vendor/mathlive/mathlive.min.js"></script>
 <style>
 
@@ -515,7 +518,7 @@ select.input { appearance: auto; background: var(--surface); }
 
 
 
-  .t-gate{max-width:420px;margin:8vh auto;padding:2rem}.t-gate .field{margin-bottom:1rem}
+  .t-gate{max-width:420px;margin:8vh auto;padding:2rem}.t-brand{display:flex;flex-direction:column;align-items:center;text-align:center;gap:.3rem;margin-bottom:1.25rem}.t-brand img{display:block;width:104px;height:104px;object-fit:contain}.t-brand b{font-size:1.35rem;font-weight:800;letter-spacing:.16em;text-transform:uppercase;color:var(--brand-deep)}.t-brand span{font-size:.75rem;letter-spacing:.14em;text-transform:uppercase;color:var(--muted)}.t-gate .field{margin-bottom:1rem}
   .t-topbar{display:flex;align-items:center;justify-content:space-between;gap:1rem;flex-wrap:wrap;margin-bottom:1rem}
   .t-tabs{display:flex;gap:.5rem;margin-bottom:1rem}
   .t-tab{padding:.5rem 1rem;border:1px solid var(--line);border-radius:999px;background:var(--surface);cursor:pointer;font-weight:600}
@@ -534,6 +537,7 @@ select.input { appearance: auto; background: var(--surface); }
 
   <div id="toasts" class="toasts" aria-live="polite"></div>
   <div id="t-gate" class="t-gate panel" hidden>
+    <div class="t-brand"><img src="assets/logo-512.png" width="104" height="104" alt="W.H. Academy logo"><b>W.H. Academy</b><span>Teachers</span></div>
     <h1 class="head__title" style="margin-top:0;">Teacher sign in</h1>
     <p class="head__sub">Use the email and PIN your administrator gave you.</p>
     <label class="field"><span class="field__label">Email</span>
