@@ -78,7 +78,7 @@
   function brand(role) {
     const x = document.createElement('div');
     x.className = 'wha-staff-brand';
-    x.innerHTML = '<div class="wha-staff-brand__mark"><img src="assets/favicon-192.png" width="46" height="46" alt="" style="width:100%;height:100%;object-fit:contain;border-radius:50%;background:#fff;display:block"></div><div><div class="wha-staff-brand__title">W.H. Academy</div><span class="wha-staff-brand__role">'+role+'</span></div>';
+    x.innerHTML = '<div class="wha-staff-brand__mark"><img src="assets/logo-mark.webp" width="46" height="46" alt="" style="width:100%;height:100%;object-fit:contain;border-radius:50%;background:#fff;display:block"></div><div><div class="wha-staff-brand__title">W.H. Academy</div><span class="wha-staff-brand__role">'+role+'</span></div>';
     return x;
   }
   function navButton(label, icon) {
