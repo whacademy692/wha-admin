@@ -2022,6 +2022,8 @@ window.WHAAdminRecheckBridge = {
     planLegacy: { Starter:'Basic', Pro:'Plus', Advanced:'Max' },
     tuition: ['Online','Home Tuition']
   };
+  // Punjab Board (Sargodha) offers only these two subjects for now (no stream) — mirrors enroll.html.
+  ENROLL.subjectsPunjab = ['Mathematics','Chemistry'];
   function edBandKey(c){ c=Number(c); return c<=8?'low':(c<=10?'matric':'inter'); }
   function edBandName(c){ c=Number(c); return c<=8?'Middle':(c<=10?'Matric':'Intermediate'); }
   function edSubjectsFor(cls, stream){
@@ -2087,31 +2089,56 @@ window.WHAAdminRecheckBridge = {
     return f ? f.total : null;
   }
 
-  // Board follows the Class (mirrors enroll.html). KPK is offered ONLY for the
-  // classes in KPK_CLASSES; keep this in sync with enroll.html.
-  var KPK_CLASSES = [10];
+  // Board follows the Class (mirrors enroll.html). Federal is always offered for Class 9-12; KPK and Punjab only for
+  // the classes listed in BOARD_CLASSES. KEEP THIS IN SYNC with BOARD_CLASSES in enroll.html.
+  //   Class 6-8: APSACS (fixed) | 9: Federal / Punjab | 10: Federal / KPK / Punjab | 11-12: Federal (fixed)
+  // REMINDER: Punjab Board (Sargodha) exists for Class 9 and 10 ONLY (Mathematics + Chemistry); KPK for Class 10 only.
+  var BOARD_CLASSES = { KPK: [10], Punjab: [9, 10] };
+  var BOARD_LABEL = { Federal: 'Federal (FBISE)', KPK: 'KPK', Punjab: 'Punjab \u2014 Sargodha' };
+  // Ladder rule: a student stays on their board when promoted. So KPK / Punjab are also offered for a HIGHER class
+  // than the board's own classes, but only to a student who is already on that board (content for those classes comes later).
+  function edBoardChoices(cls, curBoard){
+    cls = Number(cls);
+    var out = ['Federal'];
+    ['KPK', 'Punjab'].forEach(function(b){
+      var min = Math.min.apply(null, BOARD_CLASSES[b]);
+      if (BOARD_CLASSES[b].indexOf(cls) !== -1 || (cls > min && String(curBoard || '') === b)) out.push(b);
+    });
+    return out;
+  }
+  // The board that will actually be saved for this class: the saved/selected one if it is offered for the class, else Federal.
+  function edEffectiveBoard(cls, curBoard){
+    cls = Number(cls);
+    if (cls <= 8) return 'APSACS';
+    return edBoardChoices(cls, curBoard).indexOf(String(curBoard || '')) !== -1 ? String(curBoard) : 'Federal';
+  }
   function edBoardFor(cls, curBoard){
     cls = Number(cls);
     var cb = String(curBoard || '');
     if (cls <= 8) {
       return '<label class="stu-edit__row"><span class="stu-edit__lbl">Board</span><select class="input" data-field="board" disabled><option selected>APSACS</option></select></label>';
     }
-    if (KPK_CLASSES.indexOf(cls) === -1) {
-      return '<label class="stu-edit__row"><span class="stu-edit__lbl">Board</span><select class="input" data-field="board" disabled><option selected>Federal</option></select></label>';
+    var eff = edEffectiveBoard(cls, cb), ch = edBoardChoices(cls, cb);
+    var warn = (cb && cb !== eff)
+      ? '<div class="stu-edit__row"><span class="stu-edit__lbl"></span><small class="ed-fee__warn">The saved board (' + esc(cb) + ') is not offered for Class ' + cls + ' \u2014 it will be saved as ' + esc(eff) + '.</small></div>' : '';
+    var note = '<div class="stu-edit__row"><span class="stu-edit__lbl"></span><small class="muted">Reminder: Punjab Board (Sargodha) content exists for <b>Class 9 and 10 only</b> (Mathematics + Chemistry); KPK Board for Class 10 only. A promoted student stays on their board in higher classes.</small></div>';
+    var hidden = '<input type="hidden" data-field="boardBody" value="' + (eff === 'Punjab' ? 'Sargodha' : '') + '">';
+    if (ch.length === 1) {
+      return '<label class="stu-edit__row"><span class="stu-edit__lbl">Board</span><select class="input" data-field="board" disabled><option selected>Federal</option></select></label>' + hidden + warn + note;
     }
-    var fedSel = (cb !== 'KPK') ? ' selected' : '';
-    var kpkSel = (cb === 'KPK') ? ' selected' : '';
-    return '<label class="stu-edit__row"><span class="stu-edit__lbl">Board</span><select class="input" data-field="board">' +
-      '<option value="Federal"' + fedSel + '>Federal (FBISE)</option><option value="KPK"' + kpkSel + '>KPK</option></select></label>';
+    var opts = ch.map(function(b){ return '<option value="' + b + '"' + (b === eff ? ' selected' : '') + '>' + esc(BOARD_LABEL[b]) + '</option>'; }).join('');
+    return '<label class="stu-edit__row"><span class="stu-edit__lbl">Board</span><select class="input" data-field="board">' + opts + '</select></label>' + hidden + warn + note;
   }
   function edDynamicHtml(cls, cur){
     cur = cur || {};
     var k = edBandKey(cls), band = edBandName(cls);
-    var sOpts = '<option value="">\u2014 Select \u2014</option>' +
-      ENROLL.streams[k].map(function(x){ return '<option'+(x===cur.stream?' selected':'')+'>'+esc(x)+'</option>'; }).join('');
-    var streamHtml = '<label class="stu-edit__row"><span class="stu-edit__lbl">Stream</span><select class="input" data-field="stream">'+sOpts+'</select></label>';
+    var punjab = (edEffectiveBoard(cls, cur.board) === 'Punjab' && Number(cls) <= 10);   // Punjab Board Class 9-10: no stream, Mathematics + Chemistry only
+    var streamList = punjab ? ['Not applicable'] : ENROLL.streams[k], curStream = punjab ? 'Not applicable' : cur.stream;
+    var sOpts = (punjab ? '' : '<option value="">\u2014 Select \u2014</option>') +
+      streamList.map(function(x){ return '<option'+(x===curStream?' selected':'')+'>'+esc(x)+'</option>'; }).join('');
+    var streamHtml = '<label class="stu-edit__row"><span class="stu-edit__lbl">Stream</span><select class="input" data-field="stream"'+(punjab?' disabled':'')+'>'+sOpts+'</select></label>';
     var chosen = {}; (cur.subjects||[]).forEach(function(x){ chosen[String(x).trim().toLowerCase()]=1; });
-    var subjList = edSubjectsFor(cls, cur.stream);
+    var subjList = punjab ? ENROLL.subjectsPunjab : edSubjectsFor(cls, cur.stream);
     // Subjects the student already has that are not in today's list (e.g. an older
     // 11-12 student with Chemistry/Biology) stay visible + ticked, so Save never drops them silently.
     var listed = {}; subjList.forEach(function(x){ listed[x.toLowerCase()]=1; });
@@ -2170,7 +2197,7 @@ window.WHAAdminRecheckBridge = {
     html += '<label class="stu-edit__row"><span class="stu-edit__lbl">Tuition mode</span><select class="input" data-field="tuitionMode">'+tuitOpts+'</select></label>';
     html += '<div class="ed-dynamic">'+edDynamicHtml(cls, cur)+'</div>';
 
-    var handled = {fullName:1,email:1,whatsapp:1,classLevel:1,tuitionMode:1,stream:1,subjects:1,plan:1,planTier:1,planPrice:1,classBand:1,board:1,source:1,submittedAtLocal:1};
+    var handled = {fullName:1,email:1,whatsapp:1,classLevel:1,tuitionMode:1,stream:1,subjects:1,plan:1,planTier:1,planPrice:1,classBand:1,board:1,boardBody:1,source:1,submittedAtLocal:1};
     ['fatherName','fatherOccupation','schoolName','address','otherSubject'].forEach(function(k){ html += txt(k, prettyKey(k), fmtPlain(fd[k])); handled[k]=1; });
     Object.keys(fd).forEach(function(k){ if (handled[k]) return; html += txt(k, prettyKey(k), fmtPlain(fd[k])); });
 
@@ -5505,7 +5532,7 @@ window.WHAAdminRecheckBridge = {
     if (f === 'classLevel') {
       var dyn = ed.querySelector('.ed-dynamic');
       if (dyn) dyn.innerHTML = edDynamicHtml(t.value, edCurrentFromForm(ed));
-    } else if (f === 'stream') {
+    } else if (f === 'stream' || f === 'board') {
       var dyn2 = ed.querySelector('.ed-dynamic');
       var clsEl = ed.querySelector('[data-field="classLevel"]');
       if (dyn2) dyn2.innerHTML = edDynamicHtml(clsEl ? clsEl.value : 6, edCurrentFromForm(ed));
